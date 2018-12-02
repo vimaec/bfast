@@ -1,16 +1,15 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Ara3D.BFast
 {
     /// <summary>
     /// Wraps an array of bytes encoding a BFast structure and provides validation and safe access to the memory. 
-    /// The BFAST file/data format is structured as follows:\n
-    ///   * File header   - Fixed size file descriptor\n
-    ///   * Ranges        - An array of pairs of offsets that point to the begin and end of each data arrays\n
-    ///   * Array data    - All of the array data is contained in this section.\n
+    /// The BFAST file/data format is structured as follows:
+    ///   * File header   - Fixed size file descriptor
+    ///   * Ranges        - An array of pairs of offsets that point to the begin and end of each data arrays
+    ///   * Array data    - All of the array data is contained in this section.
     /// </summary>
     public class BFast
     {

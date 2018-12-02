@@ -23,9 +23,9 @@ namespace Ara3D.BFast
     [StructLayout(LayoutKind.Explicit, Pack = 4, Size = 32)]
     public struct FileHeader
     {
-        [FieldOffset(0)]    public long Magic;        // Either Constants.SameEndian or Constants.SwappedEndian depending on endianess of writer compared to reader. 
-        [FieldOffset(8)]    public long DataStart;     // <= fileSize
-        [FieldOffset(16)]   public long DataEnd;       // >= data_start and <= file_size
+        [FieldOffset(0)]    public long Magic;         // Either Constants.SameEndian or Constants.SwappedEndian depending on endianess of writer compared to reader. 
+        [FieldOffset(8)]    public long DataStart;     // <= file size
+        [FieldOffset(16)]   public long DataEnd;       // >= DataStart and <= file size
         [FieldOffset(24)]   public long NumArrays;     // number of arrays 
 
         public long ArrayOffsetsEnd { get { return ArrayOffsetsStart + NumArrays * 16; } }
