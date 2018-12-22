@@ -5,35 +5,35 @@ namespace Ara3D.BFast
 {
     public static class Constants
     {
-        public const ushort Magic = 0xBFA5;
-        public const ushort SameEndian = Magic; 
-        public const ushort SwappedEndian = 0x5AFB;
+        public const ulong Magic = 0xBFA5ul;
+        public const ulong SameEndian = Magic; 
+        public const ulong SwappedEndian = 0x5AFB;
     }
 
     [StructLayout(LayoutKind.Explicit, Pack = 4, Size = 16)]
     public struct Range
     {
-        [FieldOffset(0)] public long Begin;
-        [FieldOffset(8)] public long End;
+        [FieldOffset(0)] public ulong Begin;
+        [FieldOffset(8)] public ulong End;
 
-        public long Count { get { return End - Begin; } }
-        public static long Size = Marshal.SizeOf<FileHeader>(); // Should be 16
-    };
+        public ulong Count { get { return End - Begin; } }
+        public static ulong Size = 16;
+    }
 
     [StructLayout(LayoutKind.Explicit, Pack = 4, Size = 32)]
     public struct FileHeader
     {
-        [FieldOffset(0)]    public long Magic;         // Either Constants.SameEndian or Constants.SwappedEndian depending on endianess of writer compared to reader. 
-        [FieldOffset(8)]    public long DataStart;     // <= file size
-        [FieldOffset(16)]   public long DataEnd;       // >= DataStart and <= file size
-        [FieldOffset(24)]   public long NumArrays;     // number of arrays 
+        [FieldOffset(0)]    public ulong Magic;         // Either Constants.SameEndian or Constants.SwappedEndian depending on endianess of writer compared to reader. 
+        [FieldOffset(8)]    public ulong DataStart;     // <= file size
+        [FieldOffset(16)]   public ulong DataEnd;       // >= DataStart and <= file size
+        [FieldOffset(24)]   public ulong NumArrays;     // number of arrays 
 
-        public long ArrayOffsetsEnd { get { return ArrayOffsetsStart + NumArrays * 16; } }
+        public ulong ArrayOffsetsEnd { get { return ArrayOffsetsStart + NumArrays * 16; } }
 
-        public static long Size = Marshal.SizeOf<FileHeader>(); // Should be 32
-        public static long ArrayOffsetsStart = Size;
+        public static ulong Size = 32;
+        public static ulong ArrayOffsetsStart = Size;
 
-        public long GetOffsetOfRange(int n) {
+        public ulong GetOffsetOfRange(ulong n) {
             if (n < 0 || n >= NumArrays)
                 throw new IndexOutOfRangeException();
             return ArrayOffsetsStart + Range.Size * n;

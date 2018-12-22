@@ -1,6 +1,8 @@
 # BFAST
 
-BFAST stands for the **B**inary **F**ormat for **A**rray **S**erialization and **T**ransmission. It is a specification for encoding binary arrays of data that can efficiently serialized/deserialized between data structures and disk, or over a network from different languages.  
+BFAST stands for the **B**inary **F**ormat for **A**rray **S**erialization and **T**ransmission. 
+It is a specification for encoding collections of binary arrays of data that can efficiently serialized/deserialized 
+between data structures and disk, or over a network and from different languages and systems. 
 
 ## Features
 
@@ -44,11 +46,14 @@ The ranges start at byte 64. There are `NumArrays` of them and they have has the
 
 The data section starts at the first 64 byte aligned address immediately following the last `Range` value.
 
-
 ## Why is BFAST so Fast? 
 
-Many file or data formats require processing of the data once it comes in. Because the BFAST format is specifically for encoding binary arrays on contiguous data, it allows the consumer (decoder) of the data to allocate a single block of memory, read all of the data at once using a system call, and then set up array views, to point to the already allocated memory. For example, in C++ this can be done using begin/end iterators, ranges, spans, etc. and in JavaScript it can be done using ArrayBuffers and DataViews. 
+Many file or data formats require processing of the data once it comes in. Because the BFAST format is specifically for encoding binary arrays on contiguous data, 
+it allows the consumer (decoder) of the data to allocate a single block of memory, read all of the data at once using a system call, and then set up array views, 
+to point to the already allocated memory. For example, in C++ this can be done using begin/end iterators, ranges, spans, etc. and in JavaScript it can be done 
+using ArrayBuffers and DataViews. 
 
 ## How to Extend BFAST?
 
-BFAST by itself, is a minimal specification for efficiently encoding N byte-arrays. By convention the first array is usally a UTF-8 encoded JSON string which different file formats can use to encode additional information about the file, or about the different arrays in the data section. 
+BFAST by itself, is a minimal specification for efficiently encoding N byte-arrays. By convention the first array is usally a UTF-8 encoded JSON string which 
+different file formats can use to encode additional information about the file, or about the different arrays in the data section. 
