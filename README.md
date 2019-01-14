@@ -4,13 +4,21 @@ BFAST stands for the **B**inary **F**ormat for **A**rray **S**erialization and *
 It is a specification for encoding collections of binary arrays of data that can efficiently serialized/deserialized 
 between data structures and disk, or over a network and from different languages and systems. 
 
+The BFAST reference implementation in C++ is under 300 lines of code including documentation and spacing requiring only
+the STL. BFAST is also used as the underlying binary layout format for the [G3D geomtry file format](https://github.com/ara3d/g3d).
+
+## Use Case
+
+You would use the BFAST structure if you have a binary data to serialize that is mostly in the form of long 
+arrays. For example geometry data, meshes, or a set of files that you want to bundle together without necessarily
+compressing them or trying to re-implement TAR. 
+
 ## Features
 
 * Extremely small and easy to implement conformant encoders and decoders in different languages 
-* Format easily identified through a magic number at the front of the file
-* Endianess of encoding easily detected 
-* Data arrays are 64 byte aligned - facilitates casting to SIMD data types
-* Array offsets are encoded using 64-bits so it supports arrays of larger up to 2^63bytes in length 
+* Format and endianess easily identified through a magic number at the front of the file
+* Data arrays are 32 byte aligned - facilitates casting to SIMD data types
+* Array offsets are encoded using 64-bits so it supports large sets of data.
 
 ## Specification
 
@@ -56,4 +64,4 @@ using ArrayBuffers and DataViews.
 ## How to Extend BFAST?
 
 BFAST by itself, is a minimal specification for efficiently encoding N byte-arrays. By convention the first array is usally a UTF-8 encoded JSON string which 
-different file formats can use to encode additional information about the file, or about the different arrays in the data section. 
+different file formats can use to encode additional information about the file.
