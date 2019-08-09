@@ -5,19 +5,26 @@
     <RootNamespace>Vim</RootNamespace>
     <Authors>VIM AEC</Authors>
     <Company>VIMaec LLC.</Company>
-    <Copyright></Copyright>
+    <Copyright>Copyright 2019, VIMaec LLC. licensed under the MIT License</Copyright>
     <Description>A library for converting collection of named byte buffers to a convenient format for efficient and cross-platform serialization and deserialization.</Description>
     <PackageLicenseExpression></PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vimaec/bfast</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vimaec/bfast</RepositoryUrl>
     <RepositoryType>GitHub</RepositoryType>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageLicenseFile>license.txt</PackageLicenseFile>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="Vim.Bfast.Tests\**" />
     <EmbeddedResource Remove="Vim.Bfast.Tests\**" />
     <None Remove="Vim.Bfast.Tests\**" />
+    <None Include="..\..\license.txt">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
