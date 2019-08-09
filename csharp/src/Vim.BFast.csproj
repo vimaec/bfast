@@ -3,6 +3,15 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Vim</RootNamespace>
+    <Authors>VIM AEC</Authors>
+    <Company>VIMaec LLC.</Company>
+    <Copyright></Copyright>
+    <Description>A library for converting collection of named byte buffers to a convenient format for efficient and cross-platform serialization and deserialization.</Description>
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/vimaec/bfast</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vimaec/bfast</RepositoryUrl>
+    <RepositoryType>GitHub</RepositoryType>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
