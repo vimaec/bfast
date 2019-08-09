@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29102.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast", "csharp\src\Vim.BFast.csproj", "{FA0A3807-AB33-4FCE-9530-80C13ABCF515}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast.Tests", "csharp\tests\Vim.Bfast.Tests\Vim.BFast.Tests.csproj", "{AFF50125-33D7-4162-91BB-D800E3A2C2FC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FA0A3807-AB33-4FCE-9530-80C13ABCF515}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA0A3807-AB33-4FCE-9530-80C13ABCF515}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA0A3807-AB33-4FCE-9530-80C13ABCF515}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA0A3807-AB33-4FCE-9530-80C13ABCF515}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFF50125-33D7-4162-91BB-D800E3A2C2FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFF50125-33D7-4162-91BB-D800E3A2C2FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFF50125-33D7-4162-91BB-D800E3A2C2FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFF50125-33D7-4162-91BB-D800E3A2C2FC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E5AE3F53-D4A7-4C75-AFF1-F600F07CA7E3}
+	EndGlobalSection
+EndGlobal
