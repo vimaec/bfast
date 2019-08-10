@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Vim.BFast.csproj" />
+    <ProjectReference Include="..\Vim.BFast\Vim.BFast.csproj" />
   </ItemGroup>
 
 </Project>

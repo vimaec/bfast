@@ -3,14 +3,15 @@
 BFAST stands for the **B**inary **F**ormat for **A**rray **S**erialization and **T**ransmission. 
 
 BFAST is a data format for simple, efficient, and reliable serialization and deserialization of 
-collections of binary data with optional names as a single block of data. 
+collections of binary data with optional names as a single block of data. It is designed so
+that efficient and correct serializers can be quickly written in different languages. 
 
 ## Use Case
 
 You would use the BFAST structure if you have a binary data to serialize that is mostly in the form of 
 long arrays. For example a set of files that you want to bundle together without wanting to bring in 
-the overhead of a compression library or re-implementing TAR.
-We use BFAST to encode mesh data and as an archive format.
+the overhead of a compression library or re-implementing TAR.We use BFAST to encode mesh data and as 
+containers for other data. 
 
 ## Features
 
@@ -59,3 +60,10 @@ aligned address immediately following the last `Range` value.
 
 The first data buffer contain the names of the subsequent buffers as a concatenated list of Utf-8 encoded 
 strings separated by null characters.
+
+## Implementations 
+
+There is a C# 
+
+## Rationale
+
