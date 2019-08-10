@@ -1,11 +1,12 @@
 /*
     BFAST Binary Format for Array Streaming and Transmission
+    Copyright 2019, VIMaec LLC
     Copyright 2018, Ara 3D, Inc.
     Usage licensed under terms of MIT Licenese
 */
 #pragma once
 
-#define BFAST_VERSION { 1, 0, 0, "2018.12.21" }
+#define BFAST_VERSION { 1, 0, 0, "2019.8.10" }
 
 #include <vector>
 #include <assert.h>
@@ -20,8 +21,8 @@ namespace bfast
     typedef uint64_t ulong;
 
     // Magic numbers for identifying a BFAST format
-    const unsigned int MAGIC = 0xBFA5;
-    const unsigned int SWAPPED_MAGIC = 0x5AFB;
+    const ulong MAGIC = 0xBFA5;
+    const ulong SWAPPED_MAGIC = 0xA5BF << 48;
 
     // The size of the header
     static const int header_size = 32;
@@ -54,7 +55,7 @@ namespace bfast
 	
     // A data structure at the top of the file. This is followed by 32 bytes of padding, then an array of n array_offsets (where n is equal to num_arrays)
 	struct alignas(8) Header {        
-        ulong magic;		// Either 0xBFA5 (same-endian) of 0x5AFB (different-endian)
+        ulong magic;		// Either MAGIC (same-endian) of SWAPPED_MAGIC (different-endian)
 		ulong data_start;	// >= desc_end and modulo 64 == 0 and <= file_size
 		ulong data_end;		// >= data_start and <= file_size
 		ulong num_arrays;	// number of array_headers
@@ -172,10 +173,6 @@ namespace bfast
 
         void to_stdout() {
             copy_to(ostreambuf_iterator<byte>(cout));
-        }
-
-        void to_file(string path) {
-
         }
 
         // Returns a vector of bytes containing the byte stream 

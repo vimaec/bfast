@@ -229,10 +229,10 @@ namespace Vim
         }
 
         /// <summary>
-        /// Copies prepared BFast encoding into the given byte array in parallel.
+        /// Copies prepared BFast encoding into the given byte array 
         /// </summary>
-        public static byte[] ToBytes(this BFastData data)
-            => data.CopyTo(new byte[data.Header.DataEnd]);
+        public static byte[] ToBytes(this BFastData data, bool parallelize = false)
+            => data.CopyTo(new byte[data.Header.DataEnd], 0, parallelize);
 
         /// <summary>
         /// A ForLoop that may or may not be parallized 
@@ -268,12 +268,6 @@ namespace Vim
 
             return dest;
         }
-
-        /// <summary>
-        /// Copies prepared BFast data into the given byte array in parallel.
-        /// </summary>
-        public static byte[] ParallelCopyTo(this BFastData data, byte[] dest, int offset = 0)
-            => CopyTo(data, dest, offset, true);
 
         /// <summary>
         /// Converts an array of byte arrays to a BFAST file format in memory. 

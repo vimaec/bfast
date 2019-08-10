@@ -12,6 +12,7 @@ namespace Vim
     public static class Tests
     {
         static int[] bigArray = Enumerable.Range(0, 1000 * 1000).ToArray();
+        static IList<int[]> severalArrays = Enumerable.Repeat(bigArray, 100).ToList();
 
         [Test]
         public static void TestToStrings()
@@ -73,40 +74,37 @@ namespace Vim
 
         const int PerformanceIterations = 100;
 
-        public static byte[] PackBigArrayUsingMemoryStream()
+        public static byte[] PackWithBFastUsingMemoryStream<T>(IList<T[]> arrays) where T: struct
         {
-            var bufferSize = bigArray.Length * 4;
             var buffers = new List<INamedBuffer>();
-            for (var i = 0; i < PerformanceIterations; ++i)
+            for (var i = 0; i < arrays.Count; ++i)
             {
-                var buffer = bigArray.ToNamedBuffer(i.ToString());
+                var buffer = arrays[i].ToNamedBuffer(i.ToString());
                 buffers.Add(buffer);
             }
-            var bytes = BFastToMemoryStream(buffers);
-            Assert.IsTrue(bytes.Length > PerformanceIterations * bufferSize);
-            return bytes;
+            return BFastToMemoryStream(buffers);
         }
 
-        public static byte[] PackBigArrayWithoutBuffer()
+        public static byte[] PackWithoutBuffer(int[] data)
         {
-            var bufferSize = bigArray.Length * 4;
+            var bufferSize = data.Length * 4;
             var bytes = new byte[bufferSize * PerformanceIterations];
             for (var i=0; i < PerformanceIterations; ++i)
             {
                 // This is slower, because we are converting to bytes, rather than using a span directly
-                var buffer = bigArray.ToBytes();
+                var buffer = data.ToBytes();
                 buffer.CopyTo(bytes, bufferSize * i);
             }
             return bytes;
         }
 
-        public static byte[] PackBigArray()
+        public static byte[] PackWithBFast(int[] data)
         {
-            var bufferSize = bigArray.Length * 4;
+            var bufferSize = data.Length * 4;
             var buffers = new List<INamedBuffer>();
             for (var i = 0; i < PerformanceIterations; ++i)
             {
-                var buffer = bigArray.ToNamedBuffer(i.ToString());
+                var buffer = data.ToNamedBuffer(i.ToString());
                 buffers.Add(buffer);
             }
             var bytes = buffers.Pack();
@@ -114,6 +112,19 @@ namespace Vim
             return bytes;
         }
 
+        public static byte[] PackNaively(int[] data)
+        {
+            var bufferSize = bigArray.Length * 4;
+            var buffers = new List<byte[]>();
+            for (var i = 0; i < PerformanceIterations; ++i)
+            {
+                var buffer = bigArray.ToBytes();
+                buffers.Add(buffer);
+            }
+            var bytes = NaivePack(buffers);
+            Assert.IsTrue(bytes.Length > PerformanceIterations * bufferSize);
+            return bytes;
+        }
 
         public static byte[] NaivePack(IList<byte[]> buffers)
         {
@@ -147,31 +158,38 @@ namespace Vim
             return r;
         }
 
-
-
         // TODO: demonstrate the speed of creating a BFast as opposed to
         [Test]
         public static void PerformanceTest()
         {
             {
+                Console.WriteLine($"Packing with BFast");
                 var sw = new Stopwatch();
                 sw.Start();
-                var bytes = PackBigArray();
-                Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
-            }
-
-
-            {
-                var sw = new Stopwatch();
-                sw.Start();
-                var bytes = PackBigArrayUsingMemoryStream();
+                var bytes = PackWithBFast(bigArray);
                 Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
             }
 
             {
+                Console.WriteLine($"Packing with BFast using memory stream");
                 var sw = new Stopwatch();
                 sw.Start();
-                var bytes = PackBigArrayWithoutBuffer();
+                var bytes = PackWithBFastUsingMemoryStream(bigArray);
+                Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
+            }
+
+            {
+                Console.WriteLine($"Packing big array test");
+                var sw = new Stopwatch();
+                sw.Start();
+                var bytes = PackWithoutBuffer(bigArray);
+                Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
+            }
+
+            {
+                var sw = new Stopwatch();
+                sw.Start();
+                var bytes = PackNaively(bigArray);
                 Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
             }
         }
