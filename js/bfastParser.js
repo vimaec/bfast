@@ -1,3 +1,10 @@
+/*
+    BFAST - Binary Format for Array Streaming and Transmission
+    Copyright 2019, VIMaec LLC
+    Copyright 2018, Ara 3D, Inc.
+    Usage licensed under terms of MIT License
+	https://github.com/vimaec/bfast
+*/
 
 function parseBFast( arrayBuffer )
 {
@@ -20,7 +27,7 @@ function parseBFast( arrayBuffer )
     if (data[3] != 0) throw new Error("Expected 0 in byte position 8");
     if (data[5] != 0) throw new Error("Expected 0 in position 16");
     if (data[7] != 0) throw new Error("Expected 0 in position 24");
-    if (header.DataStart <= 32 || header.DataStart >= arrayBuffer.length) throw new Error("Data start is out of valid range");
+    if (header.DataStart <= 64 || header.DataStart >= arrayBuffer.length) throw new Error("Data start is out of valid range");
     if (header.DataEnd < header.DataStart || header.DataEnd >= arrayBuffer.length) throw new Error("Data end is out of vaid range");
     if (header.NumArrays < 0 || header.NumArrays > header.DataEnd) throw new Error("Number of arrays is invalid");
             
@@ -33,9 +40,10 @@ function parseBFast( arrayBuffer )
 
         // Check validity of data 
         if (data[pos+1] != 0) throw new Error("Expected 0 in position " + (pos + 1) * 4);
-        if (data[pos+3] != 0) throw new Error("Expected 0 in position " + (pos + 3) * 4);
+        if (data[pos + 3] != 0) throw new Error("Expected 0 in position " + (pos + 3) * 4);
         if (begin < header.DataStart || begin > header.DataEnd) throw new Error("Buffer start is out of range");
-        if (end < begin || end > header.DataEnd ) throw new Error("Buffer end is out of range");            
+        if (end < begin || end > header.DataEnd) throw new Error("Buffer end is out of range");
+        if (begin % 64 != 0) throw new Error("Beginning of data is not aligned on 64 byte boundaries");
 
         pos += 4;      
         var buffer = new Uint8Array(arrayBuffer, begin, end - begin);

@@ -3,6 +3,7 @@
     Copyright 2019, VIMaec LLC
     Copyright 2018, Ara 3D, Inc.
     Usage licensed under terms of MIT License
+	https://github.com/vimaec/bfast
 
     The BFAST format is a simple, generic, and efficient representation of 
     buffers (arrays of binary data) with optional names.  
@@ -10,7 +11,7 @@
     It can be used in place of a zip when compression is not required, or when a simple protocol
     is required for transmitting data to/from disk, between processes, or over a network. 
 
-    In C# a BFast is an `IList<INamedBuffer>` where an INamedBuffer is a simple interface
+    In C# a BFast is represented an `IList<INamedBuffer>` where an INamedBuffer is a simple interface
     that provide access to a `Bytes` property of type `Span<byte>` and a `Name` property
     of type `string`.
 */
@@ -95,7 +96,7 @@ namespace Vim
             public IList<IBuffer> Buffers;
         }
 
-        public const ulong ALIGNMENT = 32;
+        public const ulong ALIGNMENT = 64;
 
         /// <summary>
         /// Given a position in the stream, tells us where the the next aligned position will be, if it the current position is not aligned.

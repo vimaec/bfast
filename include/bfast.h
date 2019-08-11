@@ -1,12 +1,13 @@
 /*
     BFAST Binary Format for Array Streaming and Transmission
-    Copyright 2019, VIMaec LLC
+    Copyright 2019, VIMaec LLC 
     Copyright 2018, Ara 3D, Inc.
     Usage licensed under terms of MIT Licenese
+	https://github.com/vimaec/bfast
 */
 #pragma once
 
-#define BFAST_VERSION { 1, 0, 0, "2019.8.10" }
+#define BFAST_VERSION { 1, 0, 0, "2019.8.11" }
 
 #include <vector>
 #include <assert.h>
@@ -33,7 +34,7 @@ namespace bfast
     // This is the size of the header + padding to bring to alignment 
     static const int array_offsets_start = 64;
 
-    // This is sufficient alignment to fit objects natively into 512-bit (64 byte) registers 
+    // This is sufficient alignment to fit objects natively into 256-bit (32 byte) registers 
     static const int alignment = 64;
 
     // Returns true if the given value is aligned. 

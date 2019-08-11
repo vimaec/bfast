@@ -1,4 +1,12 @@
-﻿using NUnit.Framework;
+﻿/*
+    BFAST - Binary Format for Array Streaming and Transmission
+    Copyright 2019, VIMaec LLC
+    Copyright 2018, Ara 3D, Inc.
+    Usage licensed under terms of MIT License
+	https://github.com/vimaec/bfast
+*/
+
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -110,6 +118,37 @@ namespace Vim
             var bytes = buffers.Pack();
             Assert.IsTrue(bytes.Length > PerformanceIterations * bufferSize);
             return bytes;
+        }
+
+        /*
+        public static byte[] PackLessNaively(int[] data)
+        {
+            var bufferSize = bigArray.Length * 4;
+            var buffers = new List<byte[]>();
+            for (var i = 0; i < PerformanceIterations; ++i)
+            {
+                var buffer = bigArray.ToBytes();
+                buffers.Add(buffer);
+            }
+            var bytes = NaivePack(buffers);
+            Assert.IsTrue(bytes.Length > PerformanceIterations * bufferSize);
+            return bytes;
+        }
+        */
+
+public static byte[] NaivePack(IList<byte[]> buffers)
+        {
+            using (var stream = new MemoryStream())
+            using (var bw = new BinaryWriter(stream))
+            {
+                bw.Write(buffers.Count);
+                foreach (var b in buffers)
+                {
+                    bw.Write(b.Length);
+                    bw.Write(b);
+                }
+                return stream.ToArray();
+            }
         }
 
         public static byte[] PackNaively(int[] data)
