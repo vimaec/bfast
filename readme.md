@@ -9,7 +9,9 @@ languages.
 
 BFAST is intended to be a high-performance implementation that is fast enough to use as a purely 
 in-memory low-level data format, for representing arbitrary data such as meshes, point-clouds, image data, 
-etc. and to scale to data that must be processed out of core.
+etc. and to scale to data that must be processed out of core. One of the design goals was to assure 
+that the format could be easily and efficiently decoded using JavaScript on most modern web-browsers
+with very little code. 
 
 BFAST is maintained by [VIMaec LLC](https://www.vimaec.com) and is licensed under the terms of 
 the MIT License.
@@ -39,6 +41,24 @@ in ways that are overly complex, inefficient, or dependent on a particular platf
 We are proposing a standardized solution to the problem in the form of a specification and sample 
 implementation that can allow software to easily encode low level binary data in a manner 
 that is both efficient and cross-platform. 
+
+## Related Libraries 
+
+The following is a partial list of commonly used binary data serialization formatsL
+
+* [Protcol Buffers](https://developers.google.com/protocol-buffers/)
+* [FlatBuffers](https://github.com/google/flatbuffers)
+* [BINN](https://github.com/liteserver/binn/)
+* [BSON](http://bsonspec.org/)
+* [UBJSON](http://ubjson.org/)
+* [MessagePack](https://msgpack.org/)
+* [CBOR](https://cbor.io/)
+* [TAR](https://www.gnu.org/software/tar/manual/html_node/Standard.html)
+
+For a more comprehensive list see:
+
+* https://en.wikipedia.org/wiki/Comparison_of_data-serialization_formats
+* https://en.wikipedia.org/wiki/List_of_archive_formats
 
 # Specification
 
