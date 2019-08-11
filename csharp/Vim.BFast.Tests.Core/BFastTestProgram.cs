@@ -134,9 +134,8 @@ namespace Vim
             Assert.IsTrue(bytes.Length > PerformanceIterations * bufferSize);
             return bytes;
         }
-        */
-
-public static byte[] NaivePack(IList<byte[]> buffers)
+        
+        public static byte[] NaivePack(IList<byte[]> buffers)
         {
             using (var stream = new MemoryStream())
             using (var bw = new BinaryWriter(stream))
@@ -150,6 +149,7 @@ public static byte[] NaivePack(IList<byte[]> buffers)
                 return stream.ToArray();
             }
         }
+        */
 
         public static byte[] PackNaively(int[] data)
         {
@@ -209,6 +209,7 @@ public static byte[] NaivePack(IList<byte[]> buffers)
                 Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
             }
 
+            /*
             {
                 Console.WriteLine($"Packing with BFast using memory stream");
                 var sw = new Stopwatch();
@@ -216,6 +217,7 @@ public static byte[] NaivePack(IList<byte[]> buffers)
                 var bytes = PackWithBFastUsingMemoryStream(bigArray);
                 Console.WriteLine($"Created {bytes.Length} bytes in {sw.ElapsedMilliseconds} msec");
             }
+            */
 
             {
                 Console.WriteLine($"Packing big array test");
@@ -237,12 +239,12 @@ public static byte[] NaivePack(IList<byte[]> buffers)
         public static void TestAlignment()
         {
             Assert.IsTrue(IsAligned(0));
-            for (var i=1ul; i < 32; ++i)
+            for (var i=1ul; i < 64; ++i)
                 Assert.IsFalse(IsAligned(i));
-            Assert.IsTrue(IsAligned(32));
+            Assert.IsTrue(IsAligned(64));
 
-            for (var i = 1ul; i < 32; ++i)
-                Assert.AreEqual(32, ComputePadding(i) + i);
+            for (var i = 1ul; i < 64; ++i)
+                Assert.AreEqual(64, ComputePadding(i) + i);
         }
 
         public static byte GetNthByte(ulong u, int n)

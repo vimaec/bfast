@@ -13,6 +13,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast.Tests.Core", "csh
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast", "csharp\Vim.BFast\Vim.BFast.csproj", "{C2826E9C-CF2C-41F8-9C39-D8F0A101DB87}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "js", "js", "{9B5D81B1-C60B-4085-AB31-0563D4CE52F9}"
+	ProjectSection(SolutionItems) = preProject
+		js\bfastParser.js = js\bfastParser.js
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "cpp", "cpp", "{4752FFB0-F898-4AD4-8E16-1DCA4A8CAF08}"
+	ProjectSection(SolutionItems) = preProject
+		include\bfast.h = include\bfast.h
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
