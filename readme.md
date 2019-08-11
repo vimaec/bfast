@@ -32,6 +32,14 @@ containers for other data.
 * Positions of data buffers are encoded in the beginning of the file
 * Quick and easy to validate that a block is a valid BFAST encoding of data
 
+## Rationale
+
+Encoding containers of binary data is a deceptively simple problem that is easy to solve
+in ways that are overly complex, inefficient, or dependent on a particular platform. 
+We are proposing a standardized solution to the problem in the form of a specification and sample 
+implementation that can allow software to easily encode low level binary data in a manner 
+that is both efficient and cross-platform. 
+
 # Specification
 
 The file format consists of three sections:
