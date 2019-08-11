@@ -76,5 +76,10 @@ offsets relative to the beginning of the file.
 The data section starts at the first 64 byte aligned address immediately following the last `Range` value.
 This value is stored for validation purposes in the header as `DataStart`. 
 
+### Names Buffer
+
 The first data buffer contain the names of the subsequent buffers as a concatenated list of Utf-8 encoded 
-strings separated by null characters. Names may be zero-length. 
+strings separated by null characters. Names may be zero-length and are not guaranteed to be unique. 
+A name may contain any Utf-8 encoded character except the null character. 
+
+There must be N-1 names where N is the number of ranges (i.e. the `NumArrays` value in header). 
