@@ -63,7 +63,7 @@ The ranges start at byte 32. There are `NumArrays` of them and they have has the
 offsets relative to the beginning of the file.
 
 ```
-    [StructLayout(LayoutKind.Explicit, Pack = 4, Size = 16)]
+    [StructLayout(LayoutKind.Explicit, Pack = 8, Size = 16)]
     public struct Range
     {
         [FieldOffset(0)] public long Begin;

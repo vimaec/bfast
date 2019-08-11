@@ -50,7 +50,7 @@ namespace Vim
         /// * Begin must be greater than or equal to DataStart
         /// * End must be less than or equal to DataEnd
         /// </summary>
-        [StructLayout(LayoutKind.Explicit, Pack = 4, Size = 16)]
+        [StructLayout(LayoutKind.Explicit, Pack = 8, Size = 16)]
         public struct Range
         {
             [FieldOffset(0)] public ulong Begin;
@@ -96,6 +96,10 @@ namespace Vim
             public IList<IBuffer> Buffers;
         }
 
+        /// <summary>
+        /// Data arrays are aligned to 64 bytes, so that they can be cast directly to AVX-512 registers.
+        /// This is useful for efficiently working with floating point data. 
+        /// </summary>
         public const ulong ALIGNMENT = 64;
 
         /// <summary>
