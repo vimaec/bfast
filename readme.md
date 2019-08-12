@@ -20,7 +20,7 @@ the MIT License.
 
 You would use the BFAST structure if you have a binary data to serialize that is mostly in the form of 
 long arrays. For example a set of files that you want to bundle together without wanting to bring in 
-the overhead of a compression library or re-implementing TAR.We use BFAST to encode mesh data and as 
+the overhead of a compression library or re-implementing TAR. We use BFAST to encode mesh data and as 
 containers for other data. 
 
 ## Features
@@ -44,7 +44,7 @@ that is both efficient and cross-platform.
 
 ## Related Libraries 
 
-The following is a partial list of commonly used binary data serialization formatsL
+The following is a partial list of commonly used binary data serialization formats:
 
 * [Protcol Buffers](https://developers.google.com/protocol-buffers/)
 * [FlatBuffers](https://github.com/google/flatbuffers)
