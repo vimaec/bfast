@@ -1,5 +1,7 @@
 # BFAST
 
+[<img src="https://img.shields.io/nuget/v/Vim.Bfast.svg">](https://www.nuget.org/packages/Vim.Bfast) 
+
 BFAST stands for the **B**inary **F**ormat for **A**rray **S**erialization and **T**ransmission. 
 
 BFAST is a data format for simple, efficient, and reliable serialization and deserialization of 
