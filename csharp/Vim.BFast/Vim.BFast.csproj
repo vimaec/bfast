@@ -6,7 +6,7 @@
     <Authors>VIM AEC</Authors>
     <Company>VIMaec LLC.</Company>
     <Copyright>Copyright 2019, VIMaec LLC. licensed under the MIT License</Copyright>
-    <Description>A library for converting collections of named binary buffers to a single byte array for efficient cross-platform serialization and deserialization.</Description>
+    <Description>BFAST is a library for converting collections of named binary buffers to a single byte array for efficient cross-platform serialization and deserialization.</Description>
     <PackageLicenseExpression></PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vimaec/bfast</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vimaec/bfast</RepositoryUrl>
