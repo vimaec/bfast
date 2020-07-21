@@ -10,10 +10,6 @@
     
     It can be used in place of a zip when compression is not required, or when a simple protocol
     is required for transmitting data to/from disk, between processes, or over a network. 
-
-    In C# a BFast is represented an `IList<INamedBuffer>` where an INamedBuffer is a simple interface
-    that provide access to a `Bytes` property of type `Span<byte>` and a `Name` property
-    of type `string`.
 */
 
 using System;
@@ -21,10 +17,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
+using System.Text;
 
-namespace Vim
+namespace Vim.BFast
 {
     /// <summary>
     /// Wraps an array of byte buffers encoding a BFast structure and provides validation and safe access to the memory. 
@@ -35,379 +30,183 @@ namespace Vim
     /// </summary>
     public static class BFast
     {
-        public static class Constants
-        {
-            public const ulong Magic = 0xBFA5;
-            
-            // https://en.wikipedia.org/wiki/Endianness
-            public const ulong SameEndian = Magic;
-            public const ulong SwappedEndian = 0xA5BFul << 48;
-        }
-
-        /// <summary>
-        /// This tells us where a particular array begins and ends in relation to the beginning of a file.
-        /// * Begin must be less than or equal to End.
-        /// * Begin must be greater than or equal to DataStart
-        /// * End must be less than or equal to DataEnd
-        /// </summary>
-        [StructLayout(LayoutKind.Explicit, Pack = 8, Size = 16)]
-        public struct Range
-        {
-            [FieldOffset(0)] public ulong Begin;
-            [FieldOffset(8)] public ulong End;
-
-            public ulong Count => End - Begin;
-            public static ulong Size = 16;
-        }
-
-        [StructLayout(LayoutKind.Explicit, Pack = 8, Size = 32)]
-        public struct Header
-        {
-            [FieldOffset(0)] public ulong Magic;         // Either Constants.SameEndian or Constants.SwappedEndian depending on endianess of writer compared to reader. 
-            [FieldOffset(8)] public ulong DataStart;     // <= file size and >= ArrayRangesEnd and >= FileHeader.ByteCount
-            [FieldOffset(16)] public ulong DataEnd;      // >= DataStart and <= file size
-            [FieldOffset(24)] public ulong NumArrays;    // number of arrays 
-
-            /// <summary>
-            /// This is where the array ranges are finished. 
-            /// Must be less than or equal to DataStart.
-            /// Must be greater than or equal to FileHeader.ByteCount
-            /// </summary>
-            public ulong RangesEnd => Size + NumArrays * 16;
-
-            /// <summary>
-            /// The size of the FileHeader structure 
-            /// </summary>
-            public static ulong Size = 32;
-
-            /// <summary>
-            /// Returns true if the producer of the BFast file has the same endianness as the current library
-            /// </summary>
-            public bool SameEndian => Magic == Constants.SameEndian;
-        };
-
-        /// <summary>
-        /// This is an internal data structure prepared before writing out all of the BFast 
-        /// </summary>
-        public class BFastData
-        {
-            public Header Header = new Header();
-            public Range[] Ranges;
-            public IList<IBuffer> Buffers;
-        }
-
-        /// <summary>
-        /// Data arrays are aligned to 64 bytes, so that they can be cast directly to AVX-512 registers.
-        /// This is useful for efficiently working with floating point data. 
-        /// </summary>
-        public const ulong ALIGNMENT = 64;
-
         /// <summary>
         /// Given a position in the stream, tells us where the the next aligned position will be, if it the current position is not aligned.
         /// </summary>
-        public static ulong ComputeNextAlignment(ulong n)
-            => IsAligned(n) ? n : n + ALIGNMENT - (n % ALIGNMENT);
+        public static long ComputeNextAlignment(long n)
+            => IsAligned(n) ? n : n + Constants.ALIGNMENT - (n % Constants.ALIGNMENT);
 
         /// <summary>
         /// Given a position in the stream, computes how much padding is required to bring the value to an algitned point. 
         /// </summary>
-        public static ulong ComputePadding(ulong n)
+        public static long ComputePadding(long n)
             => ComputeNextAlignment(n) - n;
+
+        /// <summary>
+        /// Computes the padding requires after the array of BFastRanges are written out. 
+        /// </summary>
+        /// <param name="ranges"></param>
+        /// <returns></returns>
+        public static long ComputePadding(BFastRange[] ranges)
+            => ComputePadding(BFastPreamble.Size + ranges.Length * BFastRange.Size);
 
         /// <summary>
         /// Given a position in the stream, tells us whether the position is aligned.
         /// </summary>
-        public static bool IsAligned(ulong n)
-            => n % ALIGNMENT == 0;
+        public static bool IsAligned(long n)
+            => n % Constants.ALIGNMENT == 0;
 
         /// <summary>
-        /// Write enough padding bytes to bring the current stream position to an aligned position
+        /// Writes n zero bytes.
         /// </summary>
-        public static void WritePadding(BinaryWriter bw)
+        public static void WriteZeroBytes(this BinaryWriter bw, long n)
         {
-            var padding = ComputePadding((ulong)bw.BaseStream.Position);
-            for (var i = 0ul; i < padding; ++i)
+            for (var i = 0L; i < n; ++i)
                 bw.Write((byte)0);
-            Debug.Assert(IsAligned((ulong)bw.BaseStream.Position));
         }
 
         /// <summary>
-        /// Extracts the BFast header from the first bytes of a span.
+        /// Checks that the stream (if seekable) is well aligned
         /// </summary>
-        public static Header GetHeader(Span<byte> bytes)
+        public static void CheckAlignment(Stream stream)
         {
-            // Assure that the data is of sufficient size to get the header 
-            if (Header.Size > (ulong)bytes.Length)
-                throw new Exception($"Data length ({bytes.Length}) is smaller than size of FileHeader ({Header.Size})");
+            if (!stream.CanSeek)
+                return;
+            if (stream.Position == stream.Length)
+                return;
+            if (!IsAligned(stream.Position))
+                throw new Exception($"Stream position {stream.Position} is not well aligned");
+        }
 
-            // Get the values that make up the header
-            var values = MemoryMarshal.Cast<byte, ulong>(bytes).Slice(0, 4).ToArray();
-            var header = new Header
+        /// <summary>
+        /// Converts a collection of strings, into a null-separated byte[] array 
+        /// </summary>
+        public static byte[] PackStrings(this IEnumerable<string> strings)
+        {
+            var r = new List<byte>();
+            foreach (var name in strings)
             {
-                Magic = values[0],
-                DataStart = values[1],
-                DataEnd = values[2],
-                NumArrays = values[3],
-            };
-            header.Validate();
-            return header;
-        }
-
-        /// <summary>
-        /// Extracts the data range structs from a byte span given the file header. Also performs basic validation.
-        /// </summary>
-        public static Range[] GetRanges(Header header, Span<byte> bytes)
-        {
-            // NOTE: this will fail when dealing with larger than 2^32 sized BFAST objects
-            // This is due to a limitation of the Span implementation in .NET
-            var rangeByteSpan = bytes.Slice((int)Header.Size, (int)(Range.Size * header.NumArrays));
-            var rangeSpan = MemoryMarshal.Cast<byte, Range>(rangeByteSpan);
-            var ranges = rangeSpan.ToArray();
-            ValidateRanges(header, ranges);
-            return ranges;
-        }
-
-        /// <summary>
-        /// Given an array of bytes representing a BFast file, returns the array of data buffers. 
-        /// </summary>
-        public static IEnumerable<IBuffer> AsBFastRawBuffers(this byte[] bytes)
-            => new Memory<byte>(bytes).AsBFastRawBuffers();
-
-        /// <summary>
-        /// Given a memory block of bytes representing a BFast file, returns the array of data buffers,
-        /// </summary>
-        public static IEnumerable<IBuffer> AsBFastRawBuffers(this Memory<byte> bytes)
-        {
-            var header = GetHeader(bytes.Span);
-            var ranges = GetRanges(header, bytes.Span);
-            return ranges.Select(r => bytes.Slice((int)r.Begin, (int)r.Count).ToBuffer());
-        }
-
-        /// <summary>
-        /// BFast encode buffer names in first buffer as a concatenated array of null-terminated strings
-        /// </summary>
-        public static IEnumerable<INamedBuffer> UnpackBFastRawBuffers(this IEnumerable<IBuffer> buffers)
-            => buffers.Skip(1).Zip(buffers.First().GetStrings(), BufferExtensions.ToNamedBuffer);
-
-        /// <summary>
-        /// Converts a BFast encoded memory block of an array of named buffers
-        /// </summary>
-        public static INamedBuffer[] Unpack(this Memory<byte> bytes)
-            => bytes.AsBFastRawBuffers().UnpackBFastRawBuffers().ToArray();
-
-        /// <summary>
-        /// Converts a memory block into a BFast (array of named buffers)
-        /// </summary>
-        public static INamedBuffer[] Unpack(this byte[] bytes)
-            => new Memory<byte>(bytes).Unpack();
-
-        /// <summary>
-        /// Loads BFast raw buffers from a filePath
-        /// </summary>
-        public static IEnumerable<IBuffer> ReadBFastRawBuffers(string filePath)
-            => File.ReadAllBytes(filePath).AsBFastRawBuffers();
-
-        /// <summary>
-        /// Loads a BFast file from the given path 
-        /// </summary>
-        public static INamedBuffer[] Read(string filePath)
-            => ReadBFastRawBuffers(filePath).UnpackBFastRawBuffers().ToArray();
-
-        /// <summary>
-        /// Writes a BFast to stream using the provided BinaryWriter
-        /// </summary>
-        public static BinaryWriter Write(this BFastData data, BinaryWriter bw)
-        {
-            bw.Write(data.Header.Magic);
-            bw.Write(data.Header.DataStart);
-            bw.Write(data.Header.DataEnd);
-            bw.Write(data.Header.NumArrays);
-            foreach (var r in data.Ranges)
-                bw.Write(r.ToBytes());
-            WritePadding(bw);
-            foreach (var b in data.Buffers)
-            {
-                WritePadding(bw);
-                bw.Write(b.Bytes.ToArray());
+                var bytes = Encoding.UTF8.GetBytes(name);
+                r.AddRange(bytes);
+                r.Add(0);
             }
-            return bw;
+            return r.ToArray();
         }
 
         /// <summary>
-        /// Copies prepared BFast encoding into the given byte array 
+        /// Converts a byte[] array encoding a collection of strings separate by NULL into an array of string   
         /// </summary>
-        public static byte[] ToBytes(this BFastData data, bool parallelize = false)
-            => data.CopyTo(new byte[data.Header.DataEnd], 0, parallelize);
-
-        /// <summary>
-        /// A ForLoop that may or may not be parallized 
-        /// </summary>
-        public static void ForLoop(int from, int to, Action<int> action, bool parallelize)
+        public static string[] UnpackStrings(this byte[] bytes)
         {
-            if (parallelize)
-                Parallel.For(from, to, action);
-            else
-                for (var i = from; i < to; ++i)
-                    action(i);
-        }
-
-        /// <summary>
-        /// Copies prepared BFast data into the given byte array, optionally in parallel.
-        /// </summary>
-        public static byte[] CopyTo(this BFastData data, byte[] dest, int offset = 0, bool parallelize = false)
-        {
-            if (dest.Length < (int)data.Header.DataEnd + offset)
-                throw new Exception("Byte array is not sufficiently large");
-
-            data.Header.ToBytes().CopyTo(dest, offset);
-            data.Ranges.ToBytes().CopyTo(dest, (int)Header.Size);
-
-            ForLoop(0, data.Ranges.Length,
-                i =>
+            var r = new List<string>();
+            if (bytes.Length == 0)
+                return r.ToArray();
+            var prev = 0;
+            for (var i = 0; i < bytes.Length; ++i)
+            {
+                if (bytes[i] == 0)
                 {
-                    var range = data.Ranges[i];
-                    var buffer = data.Buffers[i];
-                    var target = dest.AsSpan().Slice((int)range.Begin + offset, (int)range.Count);
-                    buffer.Bytes.CopyTo(target);
-                }, parallelize);
-
-            return dest;
+                    r.Add(Encoding.UTF8.GetString(bytes, prev, i - prev));
+                    prev = i+1;
+                }
+            }
+            if (prev < bytes.Length)
+                r.Add(Encoding.UTF8.GetString(bytes, prev, bytes.Length - prev));
+            return r.ToArray();
         }
 
         /// <summary>
-        /// Converts an array of byte arrays to a BFAST file format in memory. 
+        /// Creates a BFAST structure, without any actual data buffers, from a list of sizes of buffers (not counting the name buffer). 
+        /// Used as an intermediate step to create a BFAST. 
         /// </summary>
-        public static byte[] Pack(this IEnumerable<byte[]> buffers, IEnumerable<string> names = null)
-            => buffers.Select(BufferExtensions.ToBuffer).Pack(names);
-
-        /// <summary>
-        /// Converts an array of byte arrays to a BFAST file format in memory. 
-        /// </summary>
-        public static byte[] Pack(this IEnumerable<IBuffer> buffers, IEnumerable<string> names = null)
-            => buffers.ToNamedBuffers(names).Pack();
-
-        /// <summary>
-        /// Converts an array of data buffers to a BFAST file format in memory. 
-        /// </summary>
-        public static byte[] Pack(this IEnumerable<INamedBuffer> buffers)
-            => buffers.ToRawBFastBuffers().ToBFastData().ToBytes();
-
-        /// <summary>
-        /// Converts a collection of named buffers into Raw BFAST buffers, 
-        /// where the first buffer contains all of the names 
-        /// </summary>
-        public static IList<IBuffer> ToRawBFastBuffers(this IEnumerable<INamedBuffer> buffers)
+        public static BFastHeader CreateBFastHeader(this long[] bufferSizes, string[] bufferNames)
         {
-            var nameBuffer = buffers.Select(b => b.Name).ToBuffer();
-            var tmp = new List<IBuffer> { nameBuffer };
-            tmp.AddRange(buffers);
-            return tmp;
-        }
+            if (bufferNames.Length != bufferSizes.Length)
+                throw new Exception($"The number of buffer sizes {bufferSizes.Length} is not equal to the number of buffer names {bufferNames.Length}");
 
-        /// <summary>
-        /// Writes an array of data buffers to the given file. 
-        /// </summary>
-        public static void ToBFastFile(this IEnumerable<INamedBuffer> buffers, string filePath)
-            => WriteBFast(buffers, File.OpenWrite(filePath));
-
-        /// <summary>
-        /// Writes an array of data buffers to the given data stream 
-        /// </summary>
-        public static T WriteBFast<T>(this IEnumerable<INamedBuffer> buffers, T stream) where T : Stream
-            => buffers.ToBFastData().Write(stream);
-
-        /// <summary>
-        /// Prepares a BFastData structure from named buffers
-        /// </summary>
-        public static BFastData ToBFastData(this IEnumerable<INamedBuffer> buffers)
-            => ToBFastData(buffers.ToRawBFastBuffers());
-
-        /// <summary>
-        /// Prepares a BFastData structure from raw BFast arrays (first one encodes names)
-        /// </summary>
-        public static BFastData ToBFastData(this IList<IBuffer> buffers)
-        {
-            var data = new BFastData();
-            data.Buffers = buffers;
-            data.Header.Magic = Constants.Magic;
-            data.Header.NumArrays = (ulong)buffers.Count;
-            data.Header.DataStart = ComputeNextAlignment(data.Header.RangesEnd);
+            var header = new BFastHeader {
+                Names = bufferNames
+            };
+            header.Preamble.Magic = Constants.Magic;
+            header.Preamble.NumArrays = bufferSizes.Length + 1;
 
             // Allocate the data for the ranges
-            data.Ranges = new Range[data.Header.NumArrays];
+            header.Ranges = new BFastRange[header.Preamble.NumArrays];
+            header.Preamble.DataStart = ComputeNextAlignment(header.Preamble.RangesEnd);
+
+            var nameBufferLength = PackStrings(bufferNames).LongLength;
+            var sizes = (new[] { nameBufferLength }).Concat(bufferSizes).ToArray();
 
             // Compute the offsets for the data buffers
-            var curIndex = data.Header.DataStart;
-            for (var i = 0; i < buffers.Count; ++i)
+            var curIndex = header.Preamble.DataStart;
+            var i = 0;
+            foreach (var size in sizes)
             {
+                curIndex = ComputeNextAlignment(curIndex);
                 Debug.Assert(IsAligned(curIndex));
 
-                data.Ranges[i].Begin = curIndex;
-                curIndex += (ulong)buffers[i].Bytes.Length;
-                data.Ranges[i].End = curIndex;
-                curIndex = ComputeNextAlignment(curIndex);
-
-                if (i > 0)
-                    Debug.Assert(data.Ranges[i].Begin >= data.Ranges[i - 1].End);
-                Debug.Assert(data.Ranges[i].Begin <= data.Ranges[i].End);
-                Debug.Assert(data.Ranges[i].Count == (ulong)buffers[i].Bytes.Length);
+                header.Ranges[i].Begin = curIndex;
+                curIndex += size;
+                header.Ranges[i].End = curIndex;
+                i++;
             }
 
             // Finish with the header
-            data.Header.DataEnd = curIndex;
+            header.Preamble.DataEnd = curIndex;
 
             // Check that everything adds up 
-            data.Header.Validate();
-            data.Header.ValidateRanges(data.Ranges);
-
-            return data;
-        }
-
-        /// <summary>
-        /// Writes the BFast data to the given data stream 
-        /// </summary>
-        public static T Write<T>(this BFastData data, T stream) where T: Stream
-        {
-            using (var bw = new BinaryWriter(stream))
-                data.Write(bw);
-            return stream;
+            return header.Validate();
         }
 
         /// <summary>
         /// Checks that the header values are sensible, and throws an exception otherwise.
         /// </summary>
-        public static void Validate(this Header header)
+        public static BFastPreamble Validate(this BFastPreamble preamble)
         {
-            if (header.Magic != Constants.SameEndian && header.Magic != Constants.SwappedEndian)
-                throw new Exception($"Invalid magic number {header.Magic}");
+            if (preamble.Magic != Constants.SameEndian && preamble.Magic != Constants.SwappedEndian)
+                throw new Exception($"Invalid magic number {preamble.Magic}");
 
-            if (header.DataStart < Header.Size)
-                throw new Exception($"Data start {header.DataStart} cannot be before the file header size {Header.Size}");
+            if (preamble.DataStart < BFastPreamble.Size)
+                throw new Exception($"Data start {preamble.DataStart} cannot be before the file header size {BFastPreamble.Size}");
 
-            if (header.DataStart > header.DataEnd)
-                throw new Exception($"Data start {header.DataStart} cannot be after the data end {header.DataEnd}");
+            if (preamble.DataStart > preamble.DataEnd)
+                throw new Exception($"Data start {preamble.DataStart} cannot be after the data end {preamble.DataEnd}");
 
-            if (header.NumArrays < 0)
-                throw new Exception($"Number of arrays {header.NumArrays} is not a positive number");
+            if (preamble.NumArrays < 0)
+                throw new Exception($"Number of arrays {preamble.NumArrays} is not a positive number");
 
-            if (header.RangesEnd > header.DataStart)
-                throw new Exception($"Computed arrays ranges end must be less than the start of data {header.DataStart}");
+            if (preamble.NumArrays > preamble.DataEnd)
+                throw new Exception($"Number of arrays {preamble.NumArrays} can't be more than the total size");
+
+            if (preamble.RangesEnd > preamble.DataStart)
+                throw new Exception($"End of range {preamble.RangesEnd} can't be after data-start {preamble.DataStart}");
+
+            return preamble;
         }
 
         /// <summary>
-        /// Checks that the range values are sensible, and throws an exception otherwise.
+        /// Checks that the header values are sensible, and throws an exception otherwise.
         /// </summary>
-        public static void ValidateRanges(this Header header, Range[] ranges)
+        public static BFastHeader Validate(this BFastHeader header)
         {
+            var preamble = header.Preamble.Validate();
+            var ranges = header.Ranges;
+            var names = header.Names;
+
+            if (preamble.RangesEnd > preamble.DataStart)
+                throw new Exception($"Computed arrays ranges end must be less than the start of data {preamble.DataStart}");
+
             if (ranges == null)
                 throw new Exception("Ranges must not be null");
 
-            var min = header.DataStart;
-            var max = header.DataEnd;
+            var min = preamble.DataStart;
+            var max = preamble.DataEnd;
 
             for (var i = 0; i < ranges.Length; ++i)
             {
                 var begin = ranges[i].Begin;
+                if (!IsAligned(begin))
+                    throw new Exception($"The beginning of the range is not well aligned {begin}");
                 var end = ranges[i].End;
                 if (begin < min || begin > max)
                     throw new Exception($"Array offset begin {begin} is not in valid span of {min} to {max}");
@@ -417,12 +216,218 @@ namespace Vim
                 if (end < begin || end > max)
                     throw new Exception($"Array offset end {end} is not in valid span of {begin} to {max}");
             }
+
+            if (names.Length != ranges.Length - 1)
+                throw new Exception($"Number of buffer names {names.Length} is not one less than the number of ranges {ranges.Length}");
+
+            return header;
         }
 
         /// <summary>
-        /// Given a list of raw buffers, we generate named buffers. 
+        /// Reads the preamble, the ranges, and the names of the rest of the buffers. 
         /// </summary>
-        public static IList<INamedBuffer> RawBFastBuffersToNamedBuffers(this IList<IBuffer> buffers)
-            => buffers.Skip(1).ToNamedBuffers(buffers[0].GetStrings()).ToList();
+        public static BFastHeader ReadBFastHeader(this Stream stream)
+        {
+            var r = new BFastHeader();
+
+            var br = new BinaryReader(stream);
+            r.Preamble = new BFastPreamble
+            {
+                Magic = br.ReadInt64(),
+                DataStart = br.ReadInt64(),
+                DataEnd = br.ReadInt64(),
+                NumArrays = br.ReadInt64(),
+            }
+            .Validate();
+
+            r.Ranges = stream.ReadArray<BFastRange>((int)r.Preamble.NumArrays);
+
+            var padding = ComputePadding(r.Ranges);
+            br.ReadBytes((int)padding);
+
+            CheckAlignment(br.BaseStream);
+            var nameBytes = br.ReadBytes((int)r.Ranges[0].Count);
+            r.Names = UnpackStrings(nameBytes);
+            padding = ComputePadding(r.Ranges[0].End);
+            br.ReadBytes((int)padding);
+            CheckAlignment(br.BaseStream);
+
+            return r.Validate();
+        }
+
+        /// <summary>
+        /// Reads a BFAST structure as a sequence of strings and objects, based on a custom function.
+        /// </summary>
+        public static List<(string, T)> ReadBFast<T>(this Stream stream, Func<Stream, string, long, T> onBuffer)
+        {
+            var r = new List<(string, T)>();
+            
+            // Read the first header, and then the first buffer.
+            var header = stream.ReadBFastHeader();
+            CheckAlignment(stream);
+
+            // For each range get the associated name, move to it, and continue forwrd 
+            for (var i = 1; i < header.Ranges.Length; ++i)
+            {
+                // Get the range, and the name for this header. 
+                var range = header.Ranges[i];
+                var name = header.Names[i - 1];
+                CheckAlignment(stream);
+                r.Add((name, onBuffer(stream, name, range.Count)));
+
+                /// Read padding bytes, to bring to alignment   
+                var padding = ComputePadding(range.End);
+                for (var j = 0; j < padding; ++j)
+                    stream.ReadByte();
+                CheckAlignment(stream);
+            }
+
+            return r;
+        }
+
+        /// <summary>
+        /// Reads a BFAST from a stream as a collection of name/byte[] tuples
+        /// This call limits the buffers to 2GB. 
+        /// </summary>
+        public static IEnumerable<INamedBuffer> ReadBFast(this Stream stream)
+            => stream.ReadBFast((s, name, count) => s.ReadArray<byte>((int)count)).Select(tuple => tuple.Item2.ToNamedBuffer(tuple.Item1));
+
+        /// <summary>
+        /// Reads a BFAST from a byte array as a collection of named buffers.
+        /// </summary>
+        public static INamedBuffer[] ReadBFast(this byte[] bytes)
+        {
+            using (var stream = new MemoryStream(bytes))
+                return ReadBFast(stream).ToArray();
+        }
+
+        /// <summary>
+        /// The total size required to put a BFAST in the header.
+        /// </summary>
+        public static long ComputeSize(long[] bufferSizes, string[] bufferNames)
+            => CreateBFastHeader(bufferSizes, bufferNames).Preamble.DataEnd;
+
+        /// <summary>
+        /// Reads a BFAST from a stream as a collection of name/T[] tuples
+        /// </summary>
+        public static unsafe IEnumerable<INamedBuffer<T>> ReadBFast<T>(this Stream stream) where T : unmanaged
+            => stream.ReadBFast((s, name, count) => s.ReadArray<T>((int)(count / sizeof(T)))).Select(tuple => tuple.Item2.ToNamedBuffer(tuple.Item1));
+
+        /// <summary>
+        /// Writes the BFast header and name buffer to stream using the provided BinaryWriter. The BinaryWriter will be properly aligned with paddin zeros 
+        /// </summary>
+        public static BinaryWriter WriteBFastHeader(this Stream stream, BFastHeader header)
+        {
+            if (header.Ranges.Length != header.Names.Length + 1)
+                throw new Exception($"The number of ranges {header.Ranges.Length} must be equal to one more than the number of names {header.Names.Length}");
+            var bw = new BinaryWriter(stream);
+            bw.Write(header.Preamble.Magic);
+            bw.Write(header.Preamble.DataStart);
+            bw.Write(header.Preamble.DataEnd);
+            bw.Write(header.Preamble.NumArrays);
+            foreach (var r in header.Ranges)
+            {
+                bw.Write(r.Begin);
+                bw.Write(r.End);
+            }
+            WriteZeroBytes(bw, ComputePadding(header.Ranges));
+
+            CheckAlignment(stream);
+            var nameBuffer = PackStrings(header.Names);
+            bw.Write(nameBuffer);
+            WriteZeroBytes(bw, ComputePadding(nameBuffer.LongLength));
+
+            CheckAlignment(stream);
+            return bw;
+        }
+
+        /// <summary>
+        /// Enables a user to write a bfast from an array of names, sizes, and a custom writing function.
+        /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
+        /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
+        /// </summary>
+        public static void WriteBFast(this Stream stream, string[] bufferNames, long[] bufferSizes, Action<Stream, int, string, long> onBuffer)
+        {
+            if (bufferSizes.Any(sz => sz < 0))
+                throw new Exception("All buffer sizes must be zero or greater than zero");
+
+            if (bufferNames.Length != bufferSizes.Length)
+                throw new Exception($"The number of buffer names {bufferNames.Length} is not equal to the number of buffer sizes {bufferSizes}");
+
+            var header = CreateBFastHeader(bufferSizes, bufferNames);
+            stream.WriteBFastHeader(header);
+            CheckAlignment(stream);
+
+            // Write the body
+            stream.WriteBFastBody(header, bufferNames, bufferSizes, onBuffer);
+        }
+
+        /// <summary>
+        /// Must be called after "WriteBFastHeader"
+        /// Enables a user to write the contents of a BFASt from an array of names, sizes, and a custom writing function.
+        /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
+        /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
+        /// </summary>
+        public static void WriteBFastBody(this Stream stream, BFastHeader header, string[] bufferNames, long[] bufferSizes, Action<Stream, int, string, long> onBuffer)
+        {
+            CheckAlignment(stream);
+
+            if (bufferSizes.Any(sz => sz < 0))
+                throw new Exception("All buffer sizes must be zero or greater than zero");
+
+            if (bufferNames.Length != bufferSizes.Length)
+                throw new Exception($"The number of buffer names {bufferNames.Length} is not equal to the number of buffer sizes {bufferSizes}");
+
+            CheckAlignment(stream);
+
+            // Then passes the binary writer for each buffer: checking that the correct amount of data was written.
+            for (var i = 0; i < bufferNames.Length; ++i)
+            {
+                CheckAlignment(stream);
+                var nBytes = bufferSizes[i];
+                onBuffer(stream, i, bufferNames[i], nBytes);
+                var padding = ComputePadding(nBytes);
+                for (var j = 0; j < padding; ++j)
+                    stream.WriteByte(0);
+                CheckAlignment(stream);
+            }   
+        }
+
+        public static unsafe long ByteSize<T>(this T[] self) where T : unmanaged
+            => self.LongLength * sizeof(T);
+
+        public static unsafe void WriteBFast<T>(this Stream stream, IEnumerable<(string, T[])> buffers) where T: unmanaged
+        {
+            var xs = buffers.ToArray();
+            stream.WriteBFast(
+                xs.Select(b => b.Item1),
+                xs.Select(b => b.Item2.ByteSize()),
+                (writer, index, name, size) => writer.Write(xs[index].Item2));
+        }
+
+        public static void WriteBFast(this Stream stream, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+            => WriteBFast(stream, bufferNames.ToArray(), bufferSizes.ToArray(), onBuffer);
+
+        public static byte[] WriteBFastToBytes(IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+        {
+            // NOTE: we can't call "WriteBFast(Stream ...)" directly because it disposes the stream before we can convert it to an array
+            using (var stream = new MemoryStream())
+            {
+                WriteBFast(stream, bufferNames.ToArray(), bufferSizes.ToArray(), onBuffer);
+                return stream.ToArray();
+            }
+        }
+
+        public static void WriteBFastToFile(string filePath, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+            => File.OpenWrite(filePath).WriteBFast(bufferNames, bufferSizes, onBuffer);
+
+        public static unsafe byte[] WriteBFastToBytes<T>(this (string, T[])[] buffers) where T: unmanaged
+            => WriteBFastToBytes(
+                buffers.Select(b => b.Item1),
+                buffers.Select(b => b.Item2.LongLength * sizeof(T)),
+                (writer, index, name, count) => writer.Write(buffers[index].Item2));
+
+        public static BFastBuilder ToBFastBuilder(this IEnumerable<INamedBuffer> buffers)
+            => new BFastBuilder().Add(buffers);
     }
 }

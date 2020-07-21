@@ -9,7 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		readme.md = readme.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast.Tests.Core", "csharp\Vim.BFast.Tests.Core\Vim.BFast.Tests.Core.csproj", "{9B63543E-EA02-40C8-A463-8C7937E163A5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast.Tests", "csharp\Vim.BFast.Tests\Vim.BFast.Tests.csproj", "{9B63543E-EA02-40C8-A463-8C7937E163A5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vim.BFast", "csharp\Vim.BFast\Vim.BFast.csproj", "{C2826E9C-CF2C-41F8-9C39-D8F0A101DB87}"
 EndProject

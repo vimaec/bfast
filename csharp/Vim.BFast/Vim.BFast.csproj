@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <RootNamespace>Vim</RootNamespace>
+    <RootNamespace>Vim.BFast</RootNamespace>
     <Authors>VIM AEC</Authors>
     <Company>VIMaec LLC.</Company>
     <Copyright>Copyright 2019, VIMaec LLC. licensed under the MIT License</Copyright>
@@ -16,20 +16,17 @@
     <AssemblyVersion>1.1.0.0</AssemblyVersion>  
     <FileVersion>1.1.0.0</FileVersion>
     <Version>1.1.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Vim.Bfast.Tests\**" />
+    <!--<Compile Remove="Vim.Bfast.Tests\**" />
     <EmbeddedResource Remove="Vim.Bfast.Tests\**" />
-    <None Remove="Vim.Bfast.Tests\**" />
+    <None Remove="Vim.Bfast.Tests\**" />-->
     <None Include="..\..\license.txt">
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Memory" Version="4.5.3" />
   </ItemGroup>
 
 </Project>
