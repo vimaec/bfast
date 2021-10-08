@@ -24,6 +24,10 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
+    <Content Include="..\..\include\bfast.h">
+      <IncludeInPackage>true</IncludeInPackage>
+      <PackagePath>content</PackagePath>
+    </Content>
   </ItemGroup>
 
 </Project>
