@@ -3,7 +3,6 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Vim.BFast</RootNamespace>
-      <PackageLicenseExpression></PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/vimaec/bfast</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vimaec/bfast</RepositoryUrl>
     <RepositoryType>GitHub</RepositoryType>
@@ -17,7 +16,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-    <ItemGroup>
+  <ItemGroup>
     <!--<Compile Remove="Vim.Bfast.Tests\**" />
     <EmbeddedResource Remove="Vim.Bfast.Tests\**" />
     <None Remove="Vim.Bfast.Tests\**" />-->
