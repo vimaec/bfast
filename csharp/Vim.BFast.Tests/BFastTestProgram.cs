@@ -14,16 +14,19 @@ using System.Linq;
 using System.Numerics;
 
 namespace Vim.BFast.Tests
-{    
+{
     public static class BFastTests
     {
         public static int Mb = 1000 * 1000;
         public static int Gb = 1000 * Mb;
 
-        static readonly byte[] Array1MB
-            = Enumerable.Range(0, Mb).Select(i => (byte)i).ToArray();
+        static byte[] ByteArray(int numBytes) =>
+            Enumerable.Range(0, numBytes).Select(i => (byte)i).ToArray();
 
-        static readonly double[] Array1GB 
+        static readonly byte[] Array1MB
+            = ByteArray(Mb);
+
+        static readonly double[] Array1GB
             = Enumerable.Range(0, Gb / 8).Select(i => (double)i).ToArray();
 
         public static (string, byte[])[] ZeroBuffers
@@ -60,7 +63,7 @@ namespace Vim.BFast.Tests
         {
             var noStrings = new string[0];
             var oneStrings = new[] { "" };
-            var twoStrings = new[] { "", "ab"  };
+            var twoStrings = new[] { "", "ab" };
             var threeStrings = new[] { "a", "b", "" };
             var noPacked = BFast.PackStrings(noStrings);
             var onePacked = BFast.PackStrings(oneStrings);
@@ -77,9 +80,9 @@ namespace Vim.BFast.Tests
         }
 
         [Test]
-        public static void Test()
+        public static void BasicTests()
         {
-            using (CreateTimer("ZeroBuffers")) 
+            using (CreateTimer("ZeroBuffers"))
             {
                 var bytes = BFast.WriteBFastToBytes(ZeroBuffers);
                 TestBFastBytes(bytes);
@@ -95,7 +98,7 @@ namespace Vim.BFast.Tests
                 Assert.AreEqual(tmp.Select(x => x.Name).ToArray(), Enumerable.Range(0, 10).Select(x => x.ToString()).ToArray());
                 Assert.AreEqual(tmp.Select(x => (int)x.NumBytes()).ToArray(), Enumerable.Repeat(Mb, 10).ToArray());
 
-                for (var i=0; i < 10; ++i)
+                for (var i = 0; i < 10; ++i)
                     Assert.AreEqual(Ten1MBBuffers[i].Item2, tmp[i].ToBytes(), $"Buffer {i} are different");
             }
             using (CreateTimer("OneGBBuffer"))
@@ -108,6 +111,52 @@ namespace Vim.BFast.Tests
                 Assert.AreEqual(tmp.Select(x => x.Name).ToArray(), new[] { "0" });
                 Assert.AreEqual(tmp.Select(x => x.NumBytes()).ToArray(), Enumerable.Repeat((long)Gb, 1).ToArray());
             }
+        }
+
+        public static BFastBuilder BFastWithSubs(int numBuffers, int numLevels, Func<int> numBytes)
+            => Enumerable.Range(0, numBuffers).Aggregate(new BFastBuilder(),
+                (bld, i) => bld.Add(i.ToString(),
+                    numLevels > 0
+                        ? BFastWithSubs(numBuffers, numLevels - 1, numBytes)
+                        : BFastRoot(numBuffers, numBytes))
+                );
+
+        public static BFastBuilder BFastRoot(int numBuffers, Func<int> numBytes)
+            => Enumerable.Range(0, numBuffers).Aggregate(new BFastBuilder(), (bld, i) => bld.Add(i.ToString(), ByteArray(numBytes()).ToBuffer()));
+
+        public static void ValidateBFast(byte[] buffer, BFastBuilder srcBuilder)
+        {
+            var bfast = BFast.ReadBFast(buffer).ToArray();
+
+            var names = srcBuilder.BufferNames().ToArray();
+            var sizes = srcBuilder.BufferSizes().ToArray();
+            var numBuffers = names.Count();
+            // We should have the same number of buffers
+            AssertEquals(bfast.Length, numBuffers);
+            for (var i = 0; i < numBuffers; i++)
+            {
+                // Of equal size
+                AssertEquals(bfast[i].Name, names[i]);
+                AssertEquals(bfast[i].Data.Length, sizes[i]);
+                // And they might be sub-buffers
+                if (srcBuilder.Children[i].Item2 is BFastBuilder childBuilder)
+                    ValidateBFast(bfast[i].ToBytes(), childBuilder);
+            }
+        }
+
+        [Test]
+        public static void TestNestedBFast()
+        {
+            var random = new Random(1234567);
+            // Create a nested BFast structure 3 layers deep with randomly-sized buffers between 1 & 256 bytes size
+            var builder = BFastWithSubs(3, 3, () => random.Next(1, 256));
+            // Create a buffer to recieve this structure;
+            var buffer = new byte[builder.GetSize()];
+            var stream = new MemoryStream(buffer, true);
+            builder.Write(stream);
+
+            // Now, lets try and deserialize these buffers:
+            ValidateBFast(buffer, builder);
         }
 
         public static void AssertEquals<T>(T x, T y)
@@ -143,13 +192,7 @@ namespace Vim.BFast.Tests
             AssertEquals(xs.Length, ys.Length);
             AssertEquals(xs[0], ys[0]);
             AssertEquals(xs[1], ys[1]);
-            AssertEquals(xs[xs.Length-1], ys[ys.Length-1]);
-        }
-
-        public static void Main(string[] args)
-        {
-            using (CreateTimer("Really big test"))
-                ReallyBigTest();
+            AssertEquals(xs[xs.Length - 1], ys[ys.Length - 1]);
         }
     }
 }

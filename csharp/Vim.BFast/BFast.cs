@@ -22,6 +22,11 @@ using System.Text;
 namespace Vim.BFast
 {
     /// <summary>
+    /// Callback function allows clients to control writing the data to the output stream
+    /// </summary>
+    public delegate long BFastWriterFn(Stream writingStream, int bufferIdx, string bufferName, long bytesToWrite);
+
+    /// <summary>
     /// Wraps an array of byte buffers encoding a BFast structure and provides validation and safe access to the memory. 
     /// The BFAST file/data format is structured as follows:
     ///   * File header   - Fixed size file descriptor
@@ -37,7 +42,7 @@ namespace Vim.BFast
             => IsAligned(n) ? n : n + Constants.ALIGNMENT - (n % Constants.ALIGNMENT);
 
         /// <summary>
-        /// Given a position in the stream, computes how much padding is required to bring the value to an algitned point. 
+        /// Given a position in the stream, computes how much padding is required to bring the value to an aligned point. 
         /// </summary>
         public static long ComputePadding(long n)
             => ComputeNextAlignment(n) - n;
@@ -72,6 +77,8 @@ namespace Vim.BFast
         {
             if (!stream.CanSeek)
                 return;
+            // TODO: Check with CD: Should we bail out here?  This means that any
+            // alignment checks for a currently-writing stream are effectively ignored.
             if (stream.Position == stream.Length)
                 return;
             if (!IsAligned(stream.Position))
@@ -107,7 +114,7 @@ namespace Vim.BFast
                 if (bytes[i] == 0)
                 {
                     r.Add(Encoding.UTF8.GetString(bytes, prev, i - prev));
-                    prev = i+1;
+                    prev = i + 1;
                 }
             }
             if (prev < bytes.Length)
@@ -124,7 +131,8 @@ namespace Vim.BFast
             if (bufferNames.Length != bufferSizes.Length)
                 throw new Exception($"The number of buffer sizes {bufferSizes.Length} is not equal to the number of buffer names {bufferNames.Length}");
 
-            var header = new BFastHeader {
+            var header = new BFastHeader
+            {
                 Names = bufferNames
             };
             header.Preamble.Magic = Constants.Magic;
@@ -147,12 +155,15 @@ namespace Vim.BFast
 
                 header.Ranges[i].Begin = curIndex;
                 curIndex += size;
+
                 header.Ranges[i].End = curIndex;
                 i++;
             }
 
             // Finish with the header
-            header.Preamble.DataEnd = curIndex;
+            // Each buffer we contain is padded to ensure the next one
+            // starts on alignment, so we pad our DataEnd to reflect this reality
+            header.Preamble.DataEnd = ComputeNextAlignment(curIndex);
 
             // Check that everything adds up 
             return header.Validate();
@@ -171,6 +182,9 @@ namespace Vim.BFast
 
             if (preamble.DataStart > preamble.DataEnd)
                 throw new Exception($"Data start {preamble.DataStart} cannot be after the data end {preamble.DataEnd}");
+
+            if (!IsAligned(preamble.DataEnd))
+                throw new Exception($"Data end {preamble.DataEnd} should be aligned");
 
             if (preamble.NumArrays < 0)
                 throw new Exception($"Number of arrays {preamble.NumArrays} is not a positive number");
@@ -211,8 +225,11 @@ namespace Vim.BFast
                 if (begin < min || begin > max)
                     throw new Exception($"Array offset begin {begin} is not in valid span of {min} to {max}");
                 if (i > 0)
+                {
                     if (begin < ranges[i - 1].End)
                         throw new Exception($"Array offset begin {begin} is overlapping with previous array {ranges[i - 1].End}");
+                }
+
                 if (end < begin || end > max)
                     throw new Exception($"Array offset end {end} is not in valid span of {begin} to {max}");
             }
@@ -261,7 +278,7 @@ namespace Vim.BFast
         public static List<(string, T)> ReadBFast<T>(this Stream stream, Func<Stream, string, long, T> onBuffer)
         {
             var r = new List<(string, T)>();
-            
+
             // Read the first header, and then the first buffer.
             var header = stream.ReadBFastHeader();
             CheckAlignment(stream);
@@ -300,6 +317,21 @@ namespace Vim.BFast
             using (var stream = new MemoryStream(bytes))
                 return ReadBFast(stream).ToArray();
         }
+
+        /// <summary>
+        /// Reads a BFAST from a file as a collection of named buffers.
+        /// </summary>
+        public static INamedBuffer[] Read(string filePath)
+        {
+            using (var stream = File.OpenRead(filePath))
+                return Read(stream);
+        }
+
+        /// <summary>
+        /// Reads a BFAST from a stream as a collection of named buffers.
+        /// </summary>
+        public static INamedBuffer[] Read(Stream stream)
+            => stream.ReadBFast().ToArray();
 
         /// <summary>
         /// The total size required to put a BFAST in the header.
@@ -346,7 +378,7 @@ namespace Vim.BFast
         /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
         /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
         /// </summary>
-        public static void WriteBFast(this Stream stream, string[] bufferNames, long[] bufferSizes, Action<Stream, int, string, long> onBuffer)
+        public static void WriteBFast(this Stream stream, string[] bufferNames, long[] bufferSizes, BFastWriterFn onBuffer)
         {
             if (bufferSizes.Any(sz => sz < 0))
                 throw new Exception("All buffer sizes must be zero or greater than zero");
@@ -355,10 +387,17 @@ namespace Vim.BFast
                 throw new Exception($"The number of buffer names {bufferNames.Length} is not equal to the number of buffer sizes {bufferSizes}");
 
             var header = CreateBFastHeader(bufferSizes, bufferNames);
+            stream.WriteBFast(header, bufferNames, bufferSizes, onBuffer);
+        }
+
+        /// <summary>
+        /// Enables a user to write a bfast from an array of names, sizes, and a custom writing function.
+        /// This is ueful when the header is already computed.
+        /// </summary>
+        public static void WriteBFast(this Stream stream, BFastHeader header, string[] bufferNames, long[] bufferSizes, BFastWriterFn onBuffer)
+        {
             stream.WriteBFastHeader(header);
             CheckAlignment(stream);
-
-            // Write the body
             stream.WriteBFastBody(header, bufferNames, bufferSizes, onBuffer);
         }
 
@@ -368,7 +407,7 @@ namespace Vim.BFast
         /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
         /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
         /// </summary>
-        public static void WriteBFastBody(this Stream stream, BFastHeader header, string[] bufferNames, long[] bufferSizes, Action<Stream, int, string, long> onBuffer)
+        public static void WriteBFastBody(this Stream stream, BFastHeader header, string[] bufferNames, long[] bufferSizes, BFastWriterFn onBuffer)
         {
             CheckAlignment(stream);
 
@@ -378,37 +417,51 @@ namespace Vim.BFast
             if (bufferNames.Length != bufferSizes.Length)
                 throw new Exception($"The number of buffer names {bufferNames.Length} is not equal to the number of buffer sizes {bufferSizes}");
 
-            CheckAlignment(stream);
-
             // Then passes the binary writer for each buffer: checking that the correct amount of data was written.
             for (var i = 0; i < bufferNames.Length; ++i)
             {
                 CheckAlignment(stream);
                 var nBytes = bufferSizes[i];
-                onBuffer(stream, i, bufferNames[i], nBytes);
+                var pos = stream.CanSeek ? stream.Position : 0;
+                var nWrittenBytes = onBuffer(stream, i, bufferNames[i], nBytes);
+                if (stream.CanSeek)
+                {
+                    if (stream.Position - pos != nWrittenBytes)
+                        throw new NotImplementedException($"Stream position {stream.Position - pos} does not reflect number of bytes claimed to be written {nWrittenBytes}");
+                }
+
+                if (nBytes != nWrittenBytes)
+                    throw new Exception($"Number of bytes written {nWrittenBytes} not equal to expected bytes{nBytes}");
                 var padding = ComputePadding(nBytes);
                 for (var j = 0; j < padding; ++j)
                     stream.WriteByte(0);
                 CheckAlignment(stream);
-            }   
+            }
         }
 
         public static unsafe long ByteSize<T>(this T[] self) where T : unmanaged
             => self.LongLength * sizeof(T);
 
-        public static unsafe void WriteBFast<T>(this Stream stream, IEnumerable<(string, T[])> buffers) where T: unmanaged
+        public static unsafe void WriteBFast<T>(this Stream stream, IEnumerable<(string, T[])> buffers) where T : unmanaged
         {
             var xs = buffers.ToArray();
+            BFastWriterFn writerFn = (writer, index, name, size) =>
+            {
+                var initPosition = writer.Position;
+                writer.Write(xs[index].Item2);
+                return writer.Position - initPosition;
+            };
+
             stream.WriteBFast(
                 xs.Select(b => b.Item1),
                 xs.Select(b => b.Item2.ByteSize()),
-                (writer, index, name, size) => writer.Write(xs[index].Item2));
+                writerFn);
         }
 
-        public static void WriteBFast(this Stream stream, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+        public static void WriteBFast(this Stream stream, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, BFastWriterFn onBuffer)
             => WriteBFast(stream, bufferNames.ToArray(), bufferSizes.ToArray(), onBuffer);
 
-        public static byte[] WriteBFastToBytes(IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+        public static byte[] WriteBFastToBytes(IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, BFastWriterFn onBuffer)
         {
             // NOTE: we can't call "WriteBFast(Stream ...)" directly because it disposes the stream before we can convert it to an array
             using (var stream = new MemoryStream())
@@ -418,14 +471,19 @@ namespace Vim.BFast
             }
         }
 
-        public static void WriteBFastToFile(string filePath, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, Action<Stream, int, string, long> onBuffer)
+        public static void WriteBFastToFile(string filePath, IEnumerable<string> bufferNames, IEnumerable<long> bufferSizes, BFastWriterFn onBuffer)
             => File.OpenWrite(filePath).WriteBFast(bufferNames, bufferSizes, onBuffer);
 
-        public static unsafe byte[] WriteBFastToBytes<T>(this (string, T[])[] buffers) where T: unmanaged
+        public static unsafe byte[] WriteBFastToBytes<T>(this (string Name, T[] Data)[] buffers) where T : unmanaged
             => WriteBFastToBytes(
-                buffers.Select(b => b.Item1),
-                buffers.Select(b => b.Item2.LongLength * sizeof(T)),
-                (writer, index, name, count) => writer.Write(buffers[index].Item2));
+                buffers.Select(b => b.Name),
+                buffers.Select(b => b.Data.LongLength * sizeof(T)),
+                (writer, index, name, size) =>
+                {
+                    var initPosition = writer.Position;
+                    writer.Write(buffers[index].Data);
+                    return writer.Position - initPosition;
+                });
 
         public static BFastBuilder ToBFastBuilder(this IEnumerable<INamedBuffer> buffers)
             => new BFastBuilder().Add(buffers);
