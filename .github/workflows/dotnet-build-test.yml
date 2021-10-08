@@ -21,7 +21,7 @@ jobs:
     - name: Install additional tools
       run: sudo apt install nuget
     - name: Check version
-      run: .github/scripts/check-nuget-version.sh csharp/Vim.BFast.csproj Vim.BFast
+      run: .github/scripts/check-nuget-version.sh csharp/Vim.BFast/Vim.BFast.csproj Vim.BFast
       shell: bash
 
     - name: Restore dependencies
