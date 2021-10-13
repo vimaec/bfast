@@ -11,7 +11,7 @@ namespace Vim.BFast
         /// <summary>
         /// Helper for reading arbitrary unmanaged types from a Stream. 
         /// </summary>
-        public static unsafe void ReadBytesBuffered(this Stream stream, byte* dest, long count, int bufferSize = 4096) 
+        public static unsafe void ReadBytesBuffered(this Stream stream, byte* dest, long count, int bufferSize = 4096)
         {
             var buffer = new byte[bufferSize];
             int bytesRead;
@@ -19,7 +19,8 @@ namespace Vim.BFast
             {
                 while ((bytesRead = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, count))) > 0)
                 {
-                    Buffer.MemoryCopy(pBuffer, dest, count, bytesRead);
+                    if (dest != null)
+                        Buffer.MemoryCopy(pBuffer, dest, count, bytesRead);
                     count -= bytesRead;
                     dest += bytesRead;
                 }
@@ -48,12 +49,16 @@ namespace Vim.BFast
         /// <summary>
         /// Helper for reading arbitrary unmanaged types from a Stream. 
         /// </summary>
-        public static unsafe void Read<T>(this Stream stream, T* dest) where T: unmanaged
+        public static unsafe void Read<T>(this Stream stream, T* dest) where T : unmanaged
             => stream.ReadBytesBuffered((byte*)dest, sizeof(T));
 
         /// <summary>
         /// Helper for reading arrays of arbitrary unmanaged types from a Stream, that might be over 2GB of size.
-        /// That said, in C#, you can never load more int.MaxValue numbers of items. 
+        /// That said, in C#, you can never load more int.MaxValue numbers of items.
+        /// NOTE: Arrays are still limited to 2gb in size unless gcAllowVeryLargeObjects is set to true
+        /// in the runtime environment.
+        /// https://docs.microsoft.com/en-us/dotnet/api/system.array?redirectedfrom=MSDN&view=netframework-4.7.2#remarks
+        /// Alternatively, we could convert to .Net Core
         /// </summary>
         public static unsafe T[] ReadArray<T>(this Stream stream, int count) where T : unmanaged
         {
@@ -61,7 +66,7 @@ namespace Vim.BFast
             fixed (T* pDest = r)
             {
 
-                byte* pBytes = (byte*)pDest;
+                var pBytes = (byte*)pDest;
                 stream.ReadBytesBuffered(pBytes, (long)count * sizeof(T));
             }
             return r;
@@ -73,7 +78,7 @@ namespace Vim.BFast
         /// </summary>
         public static unsafe T[] ReadArrayFromNumberOfBytes<T>(this Stream stream, long numBytes) where T : unmanaged
         {
-            long count = numBytes / sizeof(T);
+            var count = numBytes / sizeof(T);
             if (numBytes % sizeof(T) != 0)
                 throw new Exception($"The number of bytes {numBytes} is not divisible by the size of the type {sizeof(T)}");
             if (count >= int.MaxValue)

@@ -33,7 +33,7 @@ namespace Vim.BFast
             => Preamble.Equals(other.Preamble) &&
             Ranges.Length == other.Ranges.Length &&
             Ranges.Zip(other.Ranges, (x, y) => x.Equals(y)).All(x => x) &&
-            Names.Zip(other.Names, (x, y) => x.Equals(y)).All(x => x);        
+            Names.Zip(other.Names, (x, y) => x.Equals(y)).All(x => x);
     }
 
     /// <summary>
@@ -110,4 +110,4 @@ namespace Vim.BFast
         public bool Equals(BFastPreamble other)
             => Magic == other.Magic && DataStart == other.DataStart && DataEnd == other.DataEnd && NumArrays == other.NumArrays;
     };
-}   
+}

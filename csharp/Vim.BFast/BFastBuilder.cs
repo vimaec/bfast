@@ -34,20 +34,28 @@ namespace Vim.BFast
         public BFastHeader Header { get; private set; }
         public long GetSize() => GetOrComputeHeader().Preamble.DataEnd;
 
-        private List<(string, IBFastComponent)> _children = new List<(string, IBFastComponent)>();
+        public List<(string, IBFastComponent)> Children { get; } = new List<(string, IBFastComponent)>();
 
         public void Write(Stream stream)
-            => stream.WriteBFastBody(GetOrComputeHeader(), BufferNames().ToArray(), BufferSizes().ToArray(), OnBuffer);
+            => stream.WriteBFast(GetOrComputeHeader(),
+                BufferNames().ToArray(),
+                BufferSizes().ToArray(),
+                OnBuffer);
 
-        public void OnBuffer(Stream stream, int index, string name, long size)
+        public void Write(string filePath)
         {
-            (string bufferName, object x) = _children[index];
+            using (var stream = File.OpenWrite(filePath))
+                Write(stream);
+        }
+
+        public long OnBuffer(Stream stream, int index, string name, long size)
+        {
+            (var bufferName, var x) = Children[index];
             Debug.Assert(name == bufferName);
             Debug.Assert(size != GetSize());
-            if (x is BFastBuilder bb)
-                bb.Write(stream);
-            if (x is IBuffer b)
-                stream.Write(b);
+            Debug.Assert(size == x.GetSize());
+            x.Write(stream);
+            return size;
         }
 
         private BFastHeader GetOrComputeHeader()
@@ -57,7 +65,7 @@ namespace Vim.BFast
         private BFastBuilder _add(string name, IBFastComponent component)
         {
             Header = null;
-            _children.Add((name, component));
+            Children.Add((name, component));
             return this;
         }
 
@@ -77,9 +85,9 @@ namespace Vim.BFast
             => Add(name, new BFastBuilder().Add(buffers));
 
         public IEnumerable<string> BufferNames()
-            => _children.Select(x => x.Item1);
+            => Children.Select(x => x.Item1);
 
         public IEnumerable<long> BufferSizes()
-            => _children.Select(x => x.Item2.GetSize());
+            => Children.Select(x => x.Item2.GetSize());
     }
 }

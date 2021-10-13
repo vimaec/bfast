@@ -45,13 +45,13 @@ namespace Vim.BFast
         public int ElementSize => sizeof(T);
         public Array Data { get; }
         public T[] GetTypedData() => Data as T[];
-        public void Write(Stream stream) => stream.Write(GetTypedData());            
+        public void Write(Stream stream) => stream.Write(GetTypedData());
     }
 
     /// <summary>
     /// A concrete implementation of INamedBuffer
     /// </summary>
-    public class NamedBuffer : INamedBuffer 
+    public class NamedBuffer : INamedBuffer
     {
         public NamedBuffer(IBuffer buffer, string name) => (Buffer, Name) = (buffer, name);
         public IBuffer Buffer { get; }
@@ -64,7 +64,7 @@ namespace Vim.BFast
     /// <summary>
     /// A concrete implementation of INamedBuffer with a specific type.
     /// </summary>
-    public class NamedBuffer<T> : INamedBuffer<T> where T: unmanaged
+    public class NamedBuffer<T> : INamedBuffer<T> where T : unmanaged
     {
         public NamedBuffer(T[] data, string name) => (Array, Name) = (data, name);
         public string Name { get; }
