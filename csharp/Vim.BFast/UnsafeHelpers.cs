@@ -73,6 +73,12 @@ namespace Vim.BFast
         }
 
         /// <summary>
+        /// A wrapper for stream.Seek(numBytes, SeekOrigin.Current) to avoid allocating memory for unrecognized buffers.
+        /// </summary>
+        public static void SkipBytes(this Stream stream, long numBytes)
+            => stream.Seek(numBytes, SeekOrigin.Current);
+
+        /// <summary>
         /// Helper for reading arrays of arbitrary unmanaged types from a Stream, that might be over 2GB of size.
         /// That said, in C#, you can never load more int.MaxValue numbers of items. 
         /// </summary>
@@ -89,8 +95,12 @@ namespace Vim.BFast
         /// <summary>
         /// Helper for writing arbitrary unmanaged types 
         /// </summary>
-        public static unsafe void Write<T>(this Stream stream, T* x) where T : unmanaged
-            => stream.WriteBytesBuffered((byte*)x, sizeof(T));
+        public static unsafe void WriteValue<T>(this Stream stream, T x) where T : unmanaged
+        {
+            var p = &x;
+            stream.WriteBytesBuffered((byte*)p, sizeof(T));
+        }
+            
 
         /// <summary>
         /// Helper for writing arrays of unmanaged types 

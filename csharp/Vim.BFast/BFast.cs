@@ -19,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
+
 namespace Vim.BFast
 {
     /// <summary>
@@ -234,7 +235,7 @@ namespace Vim.BFast
                     throw new Exception($"Array offset end {end} is not in valid span of {begin} to {max}");
             }
 
-            if (names.Length != ranges.Length - 1)
+            if (names.Length < ranges.Length - 1)
                 throw new Exception($"Number of buffer names {names.Length} is not one less than the number of ranges {ranges.Length}");
 
             return header;
@@ -248,6 +249,10 @@ namespace Vim.BFast
             var r = new BFastHeader();
 
             var br = new BinaryReader(stream);
+
+            if (stream .Length - stream.Position < sizeof(long) * 4)
+                throw new Exception("Stream too short");
+
             r.Preamble = new BFastPreamble
             {
                 Magic = br.ReadInt64(),
@@ -281,6 +286,7 @@ namespace Vim.BFast
 
             // Read the first header, and then the first buffer.
             var header = stream.ReadBFastHeader();
+
             CheckAlignment(stream);
 
             // For each range get the associated name, move to it, and continue forwrd 
@@ -300,6 +306,40 @@ namespace Vim.BFast
             }
 
             return r;
+        }
+
+        /// <summary>
+        /// Reads a BFAST structure as a sequence of strings and objects, based on a custom function.
+        /// Requires a seekable stream.
+        /// Seek pointer of the given stream will be returned at the same position as when provided to this method.
+        /// </summary>
+        public static NamedBuffer<T> ReadBFastBuffer<T>(this Stream stream, string bufferName) where T: unmanaged
+        {
+            if (!stream.CanSeek)
+                throw new ArgumentException("Stream must be seekable.", nameof(stream));
+
+            // Capture the current stream position.
+            var streamOriginalPosition = stream.Position;
+
+            NamedBuffer<T> result = null;
+
+            stream.ReadBFast<object>((s, name, numBytes) =>
+            {
+                if (name == bufferName)
+                {
+                    // Consume the bytes before attempting to parse them.
+                    result = new NamedBuffer<T>(stream.ReadArray<T>((int)numBytes), name);
+                }
+                else
+                {
+                    // Skip buffer.
+                    s.SkipBytes(numBytes);
+                }
+
+                return null;
+            });
+            stream.Seek(streamOriginalPosition, SeekOrigin.Begin);
+            return result;
         }
 
         /// <summary>
@@ -427,7 +467,7 @@ namespace Vim.BFast
                 if (stream.CanSeek)
                 {
                     if (stream.Position - pos != nWrittenBytes)
-                        throw new NotImplementedException($"Stream position {stream.Position - pos} does not reflect number of bytes claimed to be written {nWrittenBytes}");
+                        throw new NotImplementedException($"Buffer:{bufferNames[i]}. Stream movement {stream.Position - pos} does not reflect number of bytes claimed to be written {nWrittenBytes}");
                 }
 
                 if (nBytes != nWrittenBytes)
