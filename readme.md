@@ -112,8 +112,7 @@ The first data buffer contain the names of the subsequent buffers as a concatena
 strings separated by null characters. Names may be zero-length and are not guaranteed to be unique. 
 A name may contain any Utf-8 encoded character except the null character. 
 
-There must be at least N-1 names where N is the number of ranges (i.e. the `NumArrays` value in header) 
-additional names are ignored. 
+There must be N-1 names where N is the number of ranges (i.e. the `NumArrays` value in header). 
 
 # Implementations
 
