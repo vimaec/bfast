@@ -50,7 +50,7 @@ namespace Vim.BFast
 
         public long OnBuffer(Stream stream, int index, string name, long size)
         {
-            (var bufferName, var x) = Children[index];
+            var (bufferName, x) = Children[index];
             Debug.Assert(name == bufferName);
             Debug.Assert(size != GetSize());
             Debug.Assert(size == x.GetSize());
@@ -58,7 +58,7 @@ namespace Vim.BFast
             return size;
         }
 
-        private BFastHeader GetOrComputeHeader()
+        public BFastHeader GetOrComputeHeader()
             => Header ?? (Header = BFast.CreateBFastHeader(
                 BufferSizes().ToArray(), BufferNames().ToArray()));
 
