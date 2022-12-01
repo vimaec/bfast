@@ -6,7 +6,7 @@ using System.Linq;
 namespace Vim.BFast
 {
     /// <summary>
-    /// Anything that can be add to a BFAST has to be abled to compute its size, and write to a stream.
+    /// Anything that can be added to a BFAST must have a size and write to a stream.
     /// </summary>
     public interface IBFastComponent
     {
