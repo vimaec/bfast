@@ -87,9 +87,9 @@ The header is a 32-byte struct with the following layout:
 
 ## Ranges Section
 
-The ranges start at byte 32. There are `NumArrays` of them and they have has the following format. 
+The ranges start at byte 32. There are `NumArrays` of them and they have the following format. 
 `NumArrays` is the total count of all buffers, including the first buffer that contains the names.
-`NumArrays` should always be equal to or less than one. Each `Begin` and `End` values are byte 
+`NumArrays` should always be equal to or greater than one. Each `Begin` and `End` values are byte 
 offsets relative to the beginning of the file.
 
 ```
