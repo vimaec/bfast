@@ -18,7 +18,7 @@ using System.Runtime.InteropServices;
 namespace Vim.BFast
 {
     /// <summary>
-    /// This contains the BFast data loaded or written from disk. 
+    /// This contains the BFAST data loaded or written from disk. 
     /// </summary>
     public class BFastHeader
     {
@@ -77,7 +77,7 @@ namespace Vim.BFast
     }
 
     /// <summary>
-    /// The header contains a magicnumber, the begin and end indices of data, and the number of arrays.
+    /// The header contains a magic number, the begin and end indices of data, and the number of arrays.
     /// </summary>
     [StructLayout(LayoutKind.Explicit, Pack = 8, Size = 32)]
     public struct BFastPreamble

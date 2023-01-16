@@ -19,7 +19,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-
 namespace Vim.BFast
 {
     /// <summary>
@@ -242,123 +241,6 @@ namespace Vim.BFast
         }
 
         /// <summary>
-        /// Reads the preamble, the ranges, and the names of the rest of the buffers. 
-        /// </summary>
-        public static BFastHeader ReadBFastHeader(this Stream stream)
-        {
-            var r = new BFastHeader();
-
-            var br = new BinaryReader(stream);
-
-            if (stream .Length - stream.Position < sizeof(long) * 4)
-                throw new Exception("Stream too short");
-
-            r.Preamble = new BFastPreamble
-            {
-                Magic = br.ReadInt64(),
-                DataStart = br.ReadInt64(),
-                DataEnd = br.ReadInt64(),
-                NumArrays = br.ReadInt64(),
-            }
-            .Validate();
-
-            r.Ranges = stream.ReadArray<BFastRange>((int)r.Preamble.NumArrays);
-
-            var padding = ComputePadding(r.Ranges);
-            br.ReadBytes((int)padding);
-
-            CheckAlignment(br.BaseStream);
-            var nameBytes = br.ReadBytes((int)r.Ranges[0].Count);
-            r.Names = UnpackStrings(nameBytes);
-            padding = ComputePadding(r.Ranges[0].End);
-            br.ReadBytes((int)padding);
-            CheckAlignment(br.BaseStream);
-
-            return r.Validate();
-        }
-
-        /// <summary>
-        /// Reads a BFAST structure as a sequence of strings and objects, based on a custom function.
-        /// </summary>
-        public static List<(string, T)> ReadBFast<T>(this Stream stream, Func<Stream, string, long, T> onBuffer)
-        {
-            var r = new List<(string, T)>();
-
-            // Read the first header, and then the first buffer.
-            var header = stream.ReadBFastHeader();
-
-            CheckAlignment(stream);
-
-            // For each range get the associated name, move to it, and continue forwrd 
-            for (var i = 1; i < header.Ranges.Length; ++i)
-            {
-                // Get the range, and the name for this header. 
-                var range = header.Ranges[i];
-                var name = header.Names[i - 1];
-                CheckAlignment(stream);
-                r.Add((name, onBuffer(stream, name, range.Count)));
-
-                /// Read padding bytes, to bring to alignment   
-                var padding = ComputePadding(range.End);
-                for (var j = 0; j < padding; ++j)
-                    stream.ReadByte();
-                CheckAlignment(stream);
-            }
-
-            return r;
-        }
-
-        /// <summary>
-        /// Reads a BFAST structure as a sequence of strings and objects, based on a custom function.
-        /// Requires a seekable stream.
-        /// Seek pointer of the given stream will be returned at the same position as when provided to this method.
-        /// </summary>
-        public static NamedBuffer<T> ReadBFastBuffer<T>(this Stream stream, string bufferName) where T: unmanaged
-        {
-            if (!stream.CanSeek)
-                throw new ArgumentException("Stream must be seekable.", nameof(stream));
-
-            // Capture the current stream position.
-            var streamOriginalPosition = stream.Position;
-
-            NamedBuffer<T> result = null;
-
-            stream.ReadBFast<object>((s, name, numBytes) =>
-            {
-                if (name == bufferName)
-                {
-                    // Consume the bytes before attempting to parse them.
-                    result = new NamedBuffer<T>(stream.ReadArray<T>((int)numBytes), name);
-                }
-                else
-                {
-                    // Skip buffer.
-                    s.SkipBytes(numBytes);
-                }
-
-                return null;
-            });
-            stream.Seek(streamOriginalPosition, SeekOrigin.Begin);
-            return result;
-        }
-
-        /// <summary>
-        /// Reads a BFAST from a stream as a collection of name/byte[] tuples
-        /// This call limits the buffers to 2GB. 
-        /// </summary>
-        public static IEnumerable<INamedBuffer> ReadBFast(this Stream stream)
-            => stream.ReadBFast((s, name, count) => s.ReadArray<byte>((int)count)).Select(tuple => tuple.Item2.ToNamedBuffer(tuple.Item1));
-
-        /// <summary>
-        /// Reads a BFAST from a byte array as a collection of named buffers.
-        /// </summary>
-        public static INamedBuffer[] ReadBFast(this byte[] bytes)
-        {
-            using (var stream = new MemoryStream(bytes))
-                return ReadBFast(stream).ToArray();
-        }
-
-        /// <summary>
         /// Reads a BFAST from a file as a collection of named buffers.
         /// </summary>
         public static INamedBuffer[] Read(string filePath)
@@ -374,19 +256,45 @@ namespace Vim.BFast
             => stream.ReadBFast().ToArray();
 
         /// <summary>
+        /// Reads a BFAST buffer from a stream as a collection of named buffers.
+        /// This call limits the buffers to 2GB.
+        /// </summary>
+        public static IEnumerable<INamedBuffer> ReadBFast(this Stream stream)
+        {
+            foreach (var br in stream.GetBFastBufferReaders())
+            {
+                var s = br.Seek();
+                yield return s.ReadArray<byte>((int)br.Size).ToNamedBuffer(br.Name);
+            }
+        }
+
+        /// <summary>
+        /// Reads a BFAST from a stream as a collection of named buffers.
+        /// This call limits the buffers to 2GB.
+        /// </summary>
+        public static unsafe IEnumerable<INamedBuffer<T>> ReadBFast<T>(this Stream stream) where T : unmanaged
+            => stream.ReadBFast<INamedBuffer<T>>((s, bufferName, bufferLength)
+                    => s.ReadArray<T>((int)(bufferLength / sizeof(T))).ToNamedBuffer(bufferName))
+                .Select(item => item.Item2);
+
+        /// <summary>
+        /// Reads a BFAST from a byte array as a collection of named buffers.
+        /// This call limits the buffers to 2GB.
+        /// </summary>
+        public static INamedBuffer[] ReadBFast(this byte[] bytes)
+        {
+            using (var stream = new MemoryStream(bytes))
+                return ReadBFast(stream).ToArray();
+        }
+
+        /// <summary>
         /// The total size required to put a BFAST in the header.
         /// </summary>
         public static long ComputeSize(long[] bufferSizes, string[] bufferNames)
             => CreateBFastHeader(bufferSizes, bufferNames).Preamble.DataEnd;
 
         /// <summary>
-        /// Reads a BFAST from a stream as a collection of name/T[] tuples
-        /// </summary>
-        public static unsafe IEnumerable<INamedBuffer<T>> ReadBFast<T>(this Stream stream) where T : unmanaged
-            => stream.ReadBFast((s, name, count) => s.ReadArray<T>((int)(count / sizeof(T)))).Select(tuple => tuple.Item2.ToNamedBuffer(tuple.Item1));
-
-        /// <summary>
-        /// Writes the BFast header and name buffer to stream using the provided BinaryWriter. The BinaryWriter will be properly aligned with paddin zeros 
+        /// Writes the BFAST header and name buffer to stream using the provided BinaryWriter. The BinaryWriter will be properly aligned by padding zeros 
         /// </summary>
         public static BinaryWriter WriteBFastHeader(this Stream stream, BFastHeader header)
         {
@@ -414,7 +322,7 @@ namespace Vim.BFast
         }
 
         /// <summary>
-        /// Enables a user to write a bfast from an array of names, sizes, and a custom writing function.
+        /// Enables a user to write a BFAST from an array of names, sizes, and a custom writing function.
         /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
         /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
         /// </summary>
@@ -431,8 +339,8 @@ namespace Vim.BFast
         }
 
         /// <summary>
-        /// Enables a user to write a bfast from an array of names, sizes, and a custom writing function.
-        /// This is ueful when the header is already computed.
+        /// Enables a user to write a BFAST from an array of names, sizes, and a custom writing function.
+        /// This is useful when the header is already computed.
         /// </summary>
         public static void WriteBFast(this Stream stream, BFastHeader header, string[] bufferNames, long[] bufferSizes, BFastWriterFn onBuffer)
         {
@@ -443,7 +351,7 @@ namespace Vim.BFast
 
         /// <summary>
         /// Must be called after "WriteBFastHeader"
-        /// Enables a user to write the contents of a BFASt from an array of names, sizes, and a custom writing function.
+        /// Enables a user to write the contents of a BFAST from an array of names, sizes, and a custom writing function.
         /// The function will receive a BinaryWriter, the index of the buffer, and is expected to return the number of bytes written.
         /// Simplifies the process of creating custom BinaryWriters, or writing extremely large arrays if necessary.
         /// </summary>
