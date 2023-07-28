@@ -1,3 +1,5 @@
+**This repository has been archived; the code is now being maintained within the [vim-format](https://github.com/vimaec/vim-format) repository.**
+
 # BFAST
 
 [<img src="https://img.shields.io/nuget/v/Vim.Bfast.svg">](https://www.nuget.org/packages/Vim.Bfast) 
